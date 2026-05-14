@@ -373,9 +373,20 @@ main() {
 
     cleanup
 
+    # 获取路由器管理 IP（优先取 br-lan，兜底用 LAN 第一个地址）
+    local router_ip=""
+    router_ip=$(ip -4 addr show br-lan 2>/dev/null | grep -oE '([0-9]+\.){3}[0-9]+' | head -n 1)
+    if [ -z "$router_ip" ]; then
+        router_ip=$(ip -4 addr show 2>/dev/null | grep -oE '([0-9]+\.){3}[0-9]+' | grep -v '^127\.' | head -n 1)
+    fi
+    if [ -z "$router_ip" ]; then
+        router_ip="<router-ip>"
+    fi
+
     print_info "=========================================="
     print_info "全部完成！"
-    print_info "访问 http://192.168.1.1/cgi-bin/luci/admin/system/netdata 查看监控"
+    print_info "LuCI 入口: http://${router_ip}/cgi-bin/luci/admin/system/netdata"
+    print_info "Netdata 面板: http://${router_ip}:19999"
     print_info "=========================================="
 }
 
