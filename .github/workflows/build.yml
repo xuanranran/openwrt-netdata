@@ -42,9 +42,6 @@ jobs:
           - arch: mips_24kc
             sdk: "24.10.4"
             package_format: ipk
-          - arch: x86_64
-            sdk: "SNAPSHOT"
-            package_format: apk
 
     steps:
       - name: Checkout repository
