@@ -63,7 +63,8 @@ CONFIGURE_ARGS += \
 	--disable-plugin-xenstat \
 	--disable-exporting-prometheus-remote-write \
 	--disable-unit-tests \
-	--disable-ml
+	--disable-ml \
+	--disable-httpd
 
 define Build/Configure
 	$(SED) 's/m4_esyscmd(\[git describe .*\])/$(PKG_VERSION)/' $(PKG_BUILD_DIR)/configure.ac
