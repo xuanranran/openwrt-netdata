@@ -33,7 +33,6 @@ jobs:
 
         sdk:
           - "24.10.4"
-          - "SNAPSHOT"
 
     steps:
       - name: Checkout repository
