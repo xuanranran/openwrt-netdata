@@ -63,7 +63,6 @@ CONFIGURE_ARGS += \
 	--disable-exporting-prometheus-remote-write \
 	--disable-unit-tests \
 	--disable-ml \
-	--disable-cloud \
 	--disable-httpd
 
 define Build/Configure
