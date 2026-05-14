@@ -32,7 +32,7 @@ define Package/netdata
   SECTION:=admin
   CATEGORY:=Administration
   DEPENDS:=+zlib +libuuid +libuv +libmnl +libjson-c +libopenssl \
-    +libstdcpp +libatomic +openssl-util +curl +bash
+    +libstdcpp +libatomic +openssl-util +curl +bash +libyaml
   TITLE:=Real-time performance monitoring tool
   URL:=https://www.netdata.cloud/
 endef
