@@ -142,7 +142,7 @@ check_installed() {
 
     if [ "$PKG_MANAGER" = "apk" ]; then
         if apk info -e netdata >/dev/null 2>&1; then
-            installed_version=$(apk info netdata 2>/dev/null | grep "^netdata-" | sed 's/netdata-//' | awk '{print $1}')
+            installed_version=$(apk list --installed 2>/dev/null | grep "^netdata-[0-9]" | head -n 1 | sed 's/netdata-\([^ ]*\).*/\1/')
         fi
     else
         if opkg list-installed | grep -q "^netdata "; then
@@ -338,6 +338,13 @@ download_and_install() {
     fi
 
     print_info "安装完成"
+
+    # 清 LuCI 缓存，确保插件在 Web 界面中生效
+    print_info "刷新 LuCI 缓存..."
+    rm -f /tmp/luci-indexcache /tmp/luci-modulecache /tmp/luci-sessions 2>/dev/null || true
+    rm -rf /tmp/luci-* 2>/dev/null || true
+    [ -x /etc/init.d/rpcd ] && /etc/init.d/rpcd reload 2>/dev/null || true
+    [ -x /etc/init.d/uhttpd ] && /etc/init.d/uhttpd reload 2>/dev/null || true
 }
 
 # 清理
