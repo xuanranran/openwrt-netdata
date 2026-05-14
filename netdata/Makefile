@@ -47,6 +47,7 @@ define Package/netdata/description
 endef
 
 TARGET_CFLAGS := $(filter-out -O%,$(TARGET_CFLAGS)) -O3
+TARGET_CXXFLAGS += -std=c++17
 
 CONFIGURE_ARGS += \
 	--with-zlib \
