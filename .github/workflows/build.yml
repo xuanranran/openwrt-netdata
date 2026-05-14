@@ -1,0 +1,122 @@
+name: Build OpenWrt Package
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'netdata/**'
+      - 'luci-app-netdata/**'
+      - '.github/workflows/build.yml'
+  pull_request:
+    paths:
+      - 'netdata/**'
+      - 'luci-app-netdata/**'
+      - '.github/workflows/build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.arch }} (${{ matrix.package_format }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            sdk: "24.10.4"
+            package_format: ipk
+          - arch: aarch64_generic
+            sdk: "24.10.4"
+            package_format: ipk
+          - arch: arm_cortex-a9_vfpv3-d16
+            sdk: "24.10.4"
+            package_format: ipk
+          - arch: mipsel_24kc
+            sdk: "24.10.4"
+            package_format: ipk
+          - arch: mips_24kc
+            sdk: "24.10.4"
+            package_format: ipk
+          - arch: x86_64
+            sdk: "SNAPSHOT"
+            package_format: apk
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build
+        run: |
+          set -e
+
+          mkdir -p "$GITHUB_WORKSPACE/artifacts"
+          sudo chown -R 1000:1000 "$GITHUB_WORKSPACE"
+
+          restore_owner() {
+            sudo chown -R --reference="$GITHUB_WORKSPACE/.." "$GITHUB_WORKSPACE"
+          }
+
+          trap restore_owner EXIT
+
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/feed" \
+            -v "$GITHUB_WORKSPACE/artifacts:/artifacts" \
+            ghcr.io/openwrt/sdk:${{ matrix.arch }}-${{ matrix.sdk }} \
+            bash -lc '
+              set -e
+
+              sed \
+                -e "s,https://git.openwrt.org/feed/,https://github.com/openwrt/," \
+                -e "s,https://git.openwrt.org/openwrt/,https://github.com/openwrt/," \
+                -e "s,https://git.openwrt.org/project/,https://github.com/openwrt/," \
+                feeds.conf.default > feeds.conf
+
+              ./scripts/feeds update -a
+
+              rm -rf feeds/packages/admin/netdata
+              mkdir -p feeds/packages/admin/netdata
+              cp -a /feed/netdata/. feeds/packages/admin/netdata/
+
+              mkdir -p feeds/luci/applications/luci-app-netdata
+              cp -a /feed/luci-app-netdata/. feeds/luci/applications/luci-app-netdata/
+
+              ./scripts/feeds install -a
+
+              echo "CONFIG_PACKAGE_netdata=m" >> .config
+              echo "CONFIG_PACKAGE_luci-app-netdata=m" >> .config
+              make defconfig
+
+              make package/feeds/packages/netdata/compile V=sc -j"$(nproc)"
+              make package/feeds/luci/luci-app-netdata/compile V=sc -j"$(nproc)"
+
+              mkdir -p /artifacts
+              find bin/packages/ -type f -name "netdata_*.${{ matrix.package_format }}" -exec cp {} /artifacts/ \;
+              find bin/packages/ -type f -name "luci-app-netdata*.${{ matrix.package_format }}" -exec cp {} /artifacts/ \;
+            '
+
+      - name: Prepare artifact
+        run: |
+          set -e
+
+          mkdir -p bin/artifacts
+          find artifacts/ -type f \( -name "netdata_*.${{ matrix.package_format }}" -o -name "luci-app-netdata*.${{ matrix.package_format }}" \) -exec cp {} bin/artifacts/ \;
+
+          if [ -z "$(ls -A bin/artifacts)" ]; then
+            echo "::error::No netdata ${{ matrix.package_format }} package found."
+            find artifacts/ -type f | sort
+            exit 1
+          fi
+
+          echo "arch=${{ matrix.arch }} sdk=${{ matrix.sdk }}" > bin/artifacts/BUILD_INFO.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: netdata-${{ matrix.arch }}-${{ matrix.package_format }}
+          path: bin/artifacts/*
+          if-no-files-found: error
