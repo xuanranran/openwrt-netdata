@@ -323,18 +323,18 @@ download_and_install() {
 
     if [ "$PKG_MANAGER" = "apk" ]; then
         cd "$TMP_DIR"
-        apk add --allow-untrusted *.apk
+        for apk_file in *netdata*.apk; do
+            [ -f "$apk_file" ] && apk add --allow-untrusted "$apk_file" || true
+        done
     else
         cd "$TMP_DIR"
-        # 先安装 netdata，再安装 luci-app-netdata
-        for ipk in netdata_*.ipk netdata-*.ipk; do
-            [ -f "$ipk" ] && opkg install --force-downgrade "$ipk" || true
+        # 先安装 netdata 主包，再安装 luci-app-netdata
+        for ipk in netdata_*.ipk; do
+            [ -f "$ipk" ] && opkg install --force-downgrade "$ipk"
         done
         for ipk in luci-app-netdata*.ipk; do
-            [ -f "$ipk" ] && opkg install --force-downgrade "$ipk" || true
+            [ -f "$ipk" ] && opkg install --force-downgrade "$ipk"
         done
-        # 兜底：安装剩余所有 ipk
-        opkg install --force-downgrade *.ipk 2>/dev/null || true
     fi
 
     print_info "安装完成"
