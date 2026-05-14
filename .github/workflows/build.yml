@@ -17,105 +17,85 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
-    name: Build ${{ matrix.arch }} (${{ matrix.package_format }})
+    name: Package ${{ matrix.arch }}-${{ matrix.sdk }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - arch: x86_64
-            sdk: "24.10.4"
-            package_format: ipk
-          - arch: aarch64_generic
-            sdk: "24.10.4"
-            package_format: ipk
-          - arch: arm_cortex-a9_vfpv3-d16
-            sdk: "24.10.4"
-            package_format: ipk
-          - arch: mipsel_24kc
-            sdk: "24.10.4"
-            package_format: ipk
-          - arch: mips_24kc
-            sdk: "24.10.4"
-            package_format: ipk
+        arch:
+          - x86_64
+          - aarch64_cortex-a53
+          - aarch64_cortex-a72
+          - aarch64_generic
+          - arm_cortex-a7
+          - arm_cortex-a7_neon-vfpv4
+          - arm_cortex-a9_vfpv3-d16
+          - arm_cortex-a15_neon-vfpv4
+          - mips_24kc
+          - mipsel_24kc
+          - mipsel_24kc_24kf
+          - mipsel_74kc
+          - riscv64_riscv64
+
+        sdk:
+          - "24.10.4"
+          - "SNAPSHOT"
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Build
+        uses: openwrt/gh-action-sdk@v9
+        env:
+          ARCH: ${{ matrix.arch }}-${{ matrix.sdk }}
+          NO_SHFMT_CHECK: true
+          PACKAGES: netdata luci-app-netdata
+          V: sc
+
+      - name: Prepare Artifacts
         run: |
-          set -e
-
-          mkdir -p "$GITHUB_WORKSPACE/artifacts"
-          sudo chown -R 1000:1000 "$GITHUB_WORKSPACE"
-
-          restore_owner() {
-            sudo chown -R --reference="$GITHUB_WORKSPACE/.." "$GITHUB_WORKSPACE"
-          }
-
-          trap restore_owner EXIT
-
-          docker run --rm \
-            -v "$GITHUB_WORKSPACE:/feed" \
-            -v "$GITHUB_WORKSPACE/artifacts:/artifacts" \
-            ghcr.io/openwrt/sdk:${{ matrix.arch }}-${{ matrix.sdk }} \
-            bash -lc '
-              set -e
-
-              if [ -f feeds.conf.default ]; then
-                sed \
-                  -e "s,https://git.openwrt.org/feed/,https://github.com/openwrt/," \
-                  -e "s,https://git.openwrt.org/openwrt/,https://github.com/openwrt/," \
-                  -e "s,https://git.openwrt.org/project/,https://github.com/openwrt/," \
-                  feeds.conf.default > feeds.conf
-              fi
-
-              ./scripts/feeds update -a
-
-              rm -rf feeds/packages/admin/netdata
-              mkdir -p feeds/packages/admin/netdata
-              cp -a /feed/netdata/. feeds/packages/admin/netdata/
-
-              mkdir -p feeds/luci/applications/luci-app-netdata
-              cp -a /feed/luci-app-netdata/. feeds/luci/applications/luci-app-netdata/
-
-              ./scripts/feeds install -a
-
-              echo "CONFIG_PACKAGE_netdata=m" >> .config
-              echo "CONFIG_PACKAGE_luci-app-netdata=m" >> .config
-              make defconfig
-
-              make package/feeds/packages/netdata/compile V=sc -j"$(nproc)"
-              make package/feeds/luci/luci-app-netdata/compile V=sc -j"$(nproc)"
-
-              mkdir -p /artifacts
-              find bin/packages/ -type f -name "netdata_*.${{ matrix.package_format }}" -exec cp {} /artifacts/ \;
-              find bin/packages/ -type f -name "luci-app-netdata*.${{ matrix.package_format }}" -exec cp {} /artifacts/ \;
-            '
-
-      - name: Prepare artifact
-        run: |
-          set -e
-
           mkdir -p bin/artifacts
-          find artifacts/ -type f \( -name "netdata_*.${{ matrix.package_format }}" -o -name "luci-app-netdata*.${{ matrix.package_format }}" \) -exec cp {} bin/artifacts/ \;
+
+          find bin/packages/ -type f -name "*.ipk" -exec cp {} bin/artifacts/ \; 2>/dev/null || true
+          find bin/packages/ -type f -name "*.apk" -exec cp {} bin/artifacts/ \; 2>/dev/null || true
 
           if [ -z "$(ls -A bin/artifacts)" ]; then
-            echo "::error::No netdata ${{ matrix.package_format }} package found."
-            find artifacts/ -type f | sort
+            echo "::error::No packages found."
+            find bin/ -type f | sort
             exit 1
           fi
 
-          echo "arch=${{ matrix.arch }} sdk=${{ matrix.sdk }}" > bin/artifacts/BUILD_INFO.txt
+          TAR_NAME="netdata-${{ matrix.arch }}-${{ matrix.sdk }}.tar.gz"
+          cd bin/artifacts && tar -czvf "../../$TAR_NAME" * && cd ../..
+          mkdir -p upload && mv "$TAR_NAME" upload/
 
-      - name: Upload artifact
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: netdata-${{ matrix.arch }}-${{ matrix.package_format }}
-          path: bin/artifacts/*
-          if-no-files-found: error
+          name: package-${{ matrix.arch }}-${{ matrix.sdk }}
+          path: upload/*.tar.gz
+          if-no-files-found: ignore
+
+      - name: Get Version
+        id: version
+        run: |
+          VERSION=$(grep '^PKG_VERSION:=' netdata/Makefile | cut -d= -f2)
+          echo "PKG_VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        with:
+          tag_name: "v${{ steps.version.outputs.PKG_VERSION }}"
+          name: "v${{ steps.version.outputs.PKG_VERSION }}"
+          body: |
+            netdata OpenWrt Packages
+
+            Version: ${{ steps.version.outputs.PKG_VERSION }}
+          files: upload/*.tar.gz
+          token: ${{ secrets.GITHUB_TOKEN }}
