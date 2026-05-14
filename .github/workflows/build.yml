@@ -70,11 +70,13 @@ jobs:
             bash -lc '
               set -e
 
-              sed \
-                -e "s,https://git.openwrt.org/feed/,https://github.com/openwrt/," \
-                -e "s,https://git.openwrt.org/openwrt/,https://github.com/openwrt/," \
-                -e "s,https://git.openwrt.org/project/,https://github.com/openwrt/," \
-                feeds.conf.default > feeds.conf
+              if [ -f feeds.conf.default ]; then
+                sed \
+                  -e "s,https://git.openwrt.org/feed/,https://github.com/openwrt/," \
+                  -e "s,https://git.openwrt.org/openwrt/,https://github.com/openwrt/," \
+                  -e "s,https://git.openwrt.org/project/,https://github.com/openwrt/," \
+                  feeds.conf.default > feeds.conf
+              fi
 
               ./scripts/feeds update -a
 
