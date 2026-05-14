@@ -23,6 +23,7 @@ PKG_BUILD_DIR=$(BUILD_DIR)/$(PKG_NAME)-v$(PKG_VERSION)
 
 PKG_INSTALL:=1
 PKG_BUILD_PARALLEL:=1
+PKG_BUILD_DEPENDS:=protobuf/host
 PKG_FIXUP:=autoreconf
 PKG_BUILD_FLAGS:=no-mips16 gc-sections
 
@@ -32,7 +33,7 @@ define Package/netdata
   SECTION:=admin
   CATEGORY:=Administration
   DEPENDS:=+zlib +libuuid +libuv +libmnl +libjson-c +libopenssl \
-    +libstdcpp +libatomic +openssl-util +curl +bash +libyaml
+    +libstdcpp +libatomic +protobuf +openssl-util +curl +bash +libyaml
   TITLE:=Real-time performance monitoring tool
   URL:=https://www.netdata.cloud/
 endef

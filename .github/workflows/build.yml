@@ -28,18 +28,8 @@ jobs:
       matrix:
         arch:
           - x86_64
-          - aarch64_cortex-a53
-          - aarch64_cortex-a72
           - aarch64_generic
           - arm_cortex-a7
-          - arm_cortex-a7_neon-vfpv4
-          - arm_cortex-a9_vfpv3-d16
-          - arm_cortex-a15_neon-vfpv4
-          - mips_24kc
-          - mipsel_24kc
-          - mipsel_24kc_24kf
-          - mipsel_74kc
-          - riscv64_riscv64
 
         sdk:
           - "24.10.4"
