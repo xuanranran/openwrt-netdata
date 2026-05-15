@@ -47,6 +47,14 @@ jobs:
           PACKAGES: netdata luci-app-netdata
           V: sc
 
+      - name: Show refreshed patch diff (dirty patch debug)
+        if: failure()
+        run: |
+          echo "=== git diff of patches ==="
+          git diff netdata/patches/ || true
+          echo "=== patch file listing ==="
+          ls -la netdata/patches/ || true
+
       - name: Prepare Artifacts
         run: |
           mkdir -p bin/artifacts
