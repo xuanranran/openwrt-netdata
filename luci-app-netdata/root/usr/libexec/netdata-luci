@@ -1,0 +1,51 @@
+#!/bin/sh
+
+CLAIM_CONF="/etc/netdata/claim.conf"
+CLOUD_URL="https://app.netdata.cloud"
+
+read_value() {
+	local key="$1"
+
+	[ -f "$CLAIM_CONF" ] || return 0
+	sed -n "s/^[[:space:]]*$key[[:space:]]*=[[:space:]]*//p" "$CLAIM_CONF" | tail -n 1
+}
+
+write_claim() {
+	local token="$1"
+	local rooms="$2"
+	local tmp
+
+	mkdir -p /etc/netdata || exit 1
+	tmp="$(mktemp /etc/netdata/claim.conf.XXXXXX)" || exit 1
+
+	{
+		echo "[global]"
+		echo "    url = $CLOUD_URL"
+		echo "    token = $token"
+		echo "    rooms = $rooms"
+	} > "$tmp"
+
+	chmod 640 "$tmp" || exit 1
+	mv "$tmp" "$CLAIM_CONF" || exit 1
+	chmod 640 "$CLAIM_CONF" || exit 1
+
+	/etc/init.d/netdata restart
+}
+
+case "$1" in
+	status)
+		/etc/init.d/netdata status
+		;;
+	claim-read)
+		printf 'url=%s\n' "$(read_value url)"
+		printf 'token=%s\n' "$(read_value token)"
+		printf 'rooms=%s\n' "$(read_value rooms)"
+		;;
+	claim-write)
+		write_claim "$2" "$3"
+		;;
+	*)
+		echo "Usage: $0 {status|claim-read|claim-write}" >&2
+		exit 1
+		;;
+esac

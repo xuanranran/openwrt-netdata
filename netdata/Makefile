@@ -24,6 +24,10 @@ PKG_BUILD_DIR=$(BUILD_DIR)/$(PKG_NAME)-v$(PKG_VERSION)
 DASHBOARD_SOURCE:=$(PKG_NAME)-dashboard-v$(PKG_VERSION).tar.gz
 DASHBOARD_SOURCE_URL:=https://app.netdata.cloud
 DASHBOARD_HASH:=0a175680392e20c2bb9737c31f4610d4169a144ef93cd60b0626e3d9a23ecda7
+DASHBOARD_V1_VERSION:=2.2.6
+DASHBOARD_V1_SOURCE:=$(PKG_NAME)-dashboard-v1-v$(DASHBOARD_V1_VERSION).tar.gz
+DASHBOARD_V1_SOURCE_URL:=https://github.com/netdata/netdata/releases/download/v$(DASHBOARD_V1_VERSION)
+DASHBOARD_V1_HASH:=bd98c146aa6d0c25f80cb50b1447b8aca8a17f0995b28a11a23e843b8f210f42
 
 PKG_INSTALL:=1
 PKG_BUILD_PARALLEL:=1
@@ -43,6 +47,14 @@ define Download/netdata-dashboard
 endef
 $(eval $(call Download,netdata-dashboard))
 
+define Download/netdata-dashboard-v1
+  FILE:=$(DASHBOARD_V1_SOURCE)
+  URL:=$(DASHBOARD_V1_SOURCE_URL)
+  URL_FILE:=$(PKG_NAME)-v$(DASHBOARD_V1_VERSION).tar.gz
+  HASH:=$(DASHBOARD_V1_HASH)
+endef
+$(eval $(call Download,netdata-dashboard-v1))
+
 define Package/netdata
   SECTION:=admin
   CATEGORY:=Administration
@@ -59,6 +71,14 @@ define Package/netdata-dashboard
   URL:=https://www.netdata.cloud/
 endef
 
+define Package/netdata-dashboard-v1
+  SECTION:=admin
+  CATEGORY:=Administration
+  DEPENDS:=+netdata
+  TITLE:=Local Netdata v1 dashboard
+  URL:=https://www.netdata.cloud/
+endef
+
 define Package/netdata/description
   netdata is a highly optimized Linux daemon providing real-time performance
   monitoring for Linux systems, applications and SNMP devices over the web.
@@ -69,6 +89,10 @@ endef
 
 define Package/netdata-dashboard/description
   Local v3 dashboard assets for the Netdata web UI.
+endef
+
+define Package/netdata-dashboard-v1/description
+  Local legacy v1 dashboard assets for the Netdata web UI.
 endef
 
 TARGET_CFLAGS := $(filter-out -O%,$(TARGET_CFLAGS)) -O3
@@ -135,6 +159,8 @@ define Package/netdata/install
 	$(CP) $(PKG_INSTALL_DIR)/etc/netdata $(1)/etc
 	$(INSTALL_DATA) ./files/netdata.conf $(1)/etc/netdata
 	touch $(1)/etc/netdata/.opt-out-from-anonymous-statistics
+	touch $(1)/etc/netdata/claim.conf
+	chmod 640 $(1)/etc/netdata/claim.conf
 	
 	#netdata init
 	$(INSTALL_DIR) $(1)/etc/init.d
@@ -154,5 +180,17 @@ define Package/netdata-dashboard/install
 	fi
 endef
 
+define Package/netdata-dashboard-v1/install
+	$(INSTALL_DIR) $(1)/usr/share/netdata/web/v1
+	$(TAR) -xzf $(DL_DIR)/$(DASHBOARD_V1_SOURCE) \
+		-C $(1)/usr/share/netdata/web/v1 \
+		--strip-components=5 \
+		$(PKG_NAME)-v$(DASHBOARD_V1_VERSION)/src/web/gui/v1
+	find $(1)/usr/share/netdata/web/v1 -name '*.map' -delete
+	rm -f $(1)/usr/share/netdata/web/v1/dashboard_v1.cmake
+	rm -f $(1)/usr/share/netdata/web/v1/README.md
+endef
+
 $(eval $(call BuildPackage,netdata))
 $(eval $(call BuildPackage,netdata-dashboard))
+$(eval $(call BuildPackage,netdata-dashboard-v1))
