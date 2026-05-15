@@ -57,7 +57,7 @@ CMAKE_OPTIONS += \
 	-DProtobuf_PROTOC_EXECUTABLE=$(STAGING_DIR_HOSTPKG)/bin/protoc \
 	-DENABLE_ACLK=On \
 	-DENABLE_CLOUD=On \
-	-DENABLE_DASHBOARD=Off \
+	-DENABLE_DASHBOARD=On \
 	-DENABLE_DBENGINE=On \
 	-DENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE=Off \
 	-DENABLE_EXPORTER_MONGODB=Off \
@@ -106,20 +106,10 @@ define Package/netdata/install
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/netdata.init $(1)/etc/init.d/netdata
 
-	#netdata webdir and remove uneeded files
+	#netdata webdir
 	if [ -d $(PKG_INSTALL_DIR)/usr/share/netdata ]; then \
 		$(INSTALL_DIR) $(1)/usr/share; \
 		$(CP) $(PKG_INSTALL_DIR)/usr/share/netdata $(1)/usr/share; \
-		rm -f $(1)/usr/share/netdata/web/fonts/*; \
-		rm -f $(1)/usr/share/netdata/web/images/*; \
-		rm -f $(1)/usr/share/netdata/web/demo*html; \
-		rm -f $(1)/usr/share/netdata/web/v3/3D_PARTY_LICENSES.txt; \
-		rm -f $(1)/usr/share/netdata/web/v3/LICENSE.md; \
-		rm -f $(1)/usr/share/netdata/web/v3/*.LICENSE.txt; \
-		rm -rf $(1)/usr/share/netdata/web/v0/*; \
-		rm -rf $(1)/usr/share/netdata/web/v1/*; \
-		rm -rf $(1)/usr/share/netdata/web/static/*; \
-		rm -f $(1)/usr/share/netdata/web/css/*; \
 	fi
 
 endef
