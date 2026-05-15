@@ -2,9 +2,6 @@
 	"luci-app-netdata": {
 		"description": "Grant UCI access for luci-app-netdata",
 		"read": {
-			"ubus": {
-				"service": [ "list" ]
-			},
 			"uci": [ "luci" ]
 		},
 		"write": {
