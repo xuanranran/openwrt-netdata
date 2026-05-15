@@ -1,17 +1,10 @@
 {
 	"luci-app-netdata": {
-		"description": "Grant access for luci-app-netdata",
+		"description": "Grant UCI access for luci-app-netdata",
 		"read": {
-			"file": {
-				"/usr/libexec/netdata-luci": [ "exec" ],
-				"/usr/share/netdata/web/v3/index.html": [ "stat" ]
-			},
 			"uci": [ "luci" ]
 		},
 		"write": {
-			"file": {
-				"/usr/libexec/netdata-luci": [ "exec" ]
-			},
 			"uci": [ "luci" ]
 		}
 	}

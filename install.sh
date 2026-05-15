@@ -23,8 +23,6 @@ TMP_DIR="/tmp/netdata_install"
 
 # 是否使用 prerelease 版本
 USE_PRERELEASE=false
-INSTALL_DASHBOARD=true
-INSTALL_DASHBOARD_SET=false
 
 # 打印信息函数
 print_info() {
@@ -84,29 +82,6 @@ select_github_mirror() {
     echo ""
 }
 
-# 选择是否安装本地面板
-select_dashboard_mode() {
-    if [ "$INSTALL_DASHBOARD_SET" = true ]; then
-        return
-    fi
-
-    echo ""
-    printf "${CYAN}是否安装本地 V3 面板和 LuCI 入口? [Y/n]: ${NC}" >&2
-    read dashboard_choice < /dev/tty
-
-    case "$dashboard_choice" in
-        n|N)
-            INSTALL_DASHBOARD=false
-            print_info "使用轻量模式: 不安装本地 V3 面板和 LuCI 入口"
-            ;;
-        *)
-            INSTALL_DASHBOARD=true
-            print_info "使用完整模式: 安装本地 V3 面板和 LuCI 入口"
-            ;;
-    esac
-    echo ""
-}
-
 # 检查命令是否存在
 check_command() {
     if ! command -v "$1" >/dev/null 2>&1; then
@@ -141,6 +116,12 @@ check_requirements() {
     fi
 
     print_info "检测到包管理器: $PKG_MANAGER"
+
+    if [ "$PKG_MANAGER" != "apk" ]; then
+        print_error "预编译包仅支持 OpenWrt SNAPSHOT 的 apk 包管理器"
+        print_error "当前系统使用 opkg，请自行源码编译或切换到 SNAPSHOT"
+        exit 1
+    fi
 
     # 检查 curl
     if ! check_command curl; then
@@ -450,21 +431,9 @@ download_and_install() {
     local arch="$2"
     local assets="$3"
 
-    # 确定 SDK 后缀
-    local sdk_suffix=""
-    if [ "$PKG_MANAGER" = "apk" ]; then
-        sdk_suffix="SNAPSHOT"
-    else
-        sdk_suffix="24.10.4"
-    fi
-
-    # 构造目标文件名格式：netdata-${arch}-${sdk_suffix}.tar.gz
-    local package_prefix="netdata"
-    if [ "$INSTALL_DASHBOARD" = false ]; then
-        package_prefix="netdata-lite"
-    fi
-
-    local target_filename="${package_prefix}-${arch}-${sdk_suffix}.tar.gz"
+    # 仅发布 SNAPSHOT 构建。
+    local sdk_suffix="SNAPSHOT"
+    local target_filename="netdata-${arch}-${sdk_suffix}.tar.gz"
 
     print_info "正在寻找匹配的安装包: $target_filename"
 
@@ -473,7 +442,7 @@ download_and_install() {
     if [ -z "$matched_file" ]; then
         print_warn "未找到精确匹配: $target_filename"
         print_info "尝试模糊匹配..."
-        matched_file=$(echo "$assets" | grep "${package_prefix}" | grep "${arch}" | grep "${sdk_suffix}" | grep ".tar.gz" | head -n 1)
+        matched_file=$(echo "$assets" | grep "netdata" | grep "${arch}" | grep "${sdk_suffix}" | grep ".tar.gz" | head -n 1)
     fi
 
     if [ -z "$matched_file" ]; then
@@ -529,7 +498,6 @@ main() {
     local arch=$(get_cpu_arch)
     local latest_version=$(get_latest_version)
     local version=$(select_version "$latest_version")
-    select_dashboard_mode
 
     local assets=$(get_release_assets "$version")
 
@@ -549,13 +517,8 @@ main() {
 
     print_info "=========================================="
     print_info "全部完成！"
-    if [ "$INSTALL_DASHBOARD" = true ]; then
-        print_info "LuCI 入口: http://${router_ip}/cgi-bin/luci/admin/system/netdata"
-        print_info "Netdata 面板: http://${router_ip}:19999"
-    else
-        print_info "轻量模式未安装本地 V3 面板和 LuCI 入口"
-        print_info "Netdata API: http://${router_ip}:19999/api/v1/info"
-    fi
+    print_info "LuCI 入口: http://${router_ip}/cgi-bin/luci/admin/system/netdata"
+    print_info "Netdata 面板: http://${router_ip}:19999/v3/"
     print_info "=========================================="
 }
 
@@ -568,15 +531,9 @@ parse_args() {
                 USE_PRERELEASE=true
                 shift
                 ;;
-            --no-dashboard)
-                INSTALL_DASHBOARD=false
-                INSTALL_DASHBOARD_SET=true
-                shift
-                ;;
             --help|-h)
                 echo "用法: $0 [选项]"
                 echo "  --prerelease    使用预发布版本"
-                echo "  --no-dashboard  轻量安装，不下载本地 V3 面板和 LuCI 入口"
                 exit 0
                 ;;
         esac

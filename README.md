@@ -3,7 +3,7 @@
 ![GitHub Release](https://img.shields.io/github/v/release/xuanranran/openwrt-netdata)
 ![Build Status](https://img.shields.io/github/actions/workflow/status/xuanranran/openwrt-netdata/build.yml)
 
-📊 Real-time performance monitoring for OpenWrt — Netdata v1.40.0 + LuCI interface.
+📊 Real-time performance monitoring for OpenWrt — Netdata v2.10.3 + LuCI interface.
 
 ## How to build
 
@@ -25,13 +25,8 @@
 
 - Login OpenWrt terminal (SSH)
 
-- Install `curl` package
+- Install `curl` package on OpenWrt SNAPSHOT
   ```shell
-  # for opkg package manager (OpenWrt 21.02 ~ 24.10)
-  opkg update
-  opkg install curl
-
-  # for apk package manager (OpenWrt Snapshot)
   apk update
   apk add curl
   ```
@@ -52,25 +47,14 @@
 
 | Architecture | SDK |
 |---|---|
-| x86_64 | 24.10.4 / SNAPSHOT |
-| aarch64_cortex-a53 | 24.10.4 / SNAPSHOT |
-| aarch64_cortex-a72 | 24.10.4 / SNAPSHOT |
-| aarch64_generic | 24.10.4 / SNAPSHOT |
-| arm_cortex-a7 | 24.10.4 / SNAPSHOT |
-| arm_cortex-a7_neon-vfpv4 | 24.10.4 / SNAPSHOT |
-| arm_cortex-a9_vfpv3-d16 | 24.10.4 / SNAPSHOT |
-| arm_cortex-a15_neon-vfpv4 | 24.10.4 / SNAPSHOT |
-| mips_24kc | 24.10.4 / SNAPSHOT |
-| mipsel_24kc | 24.10.4 / SNAPSHOT |
-| mipsel_24kc_24kf | 24.10.4 / SNAPSHOT |
-| mipsel_74kc | 24.10.4 / SNAPSHOT |
-| riscv64_riscv64 | 24.10.4 / SNAPSHOT |
+| x86_64 | SNAPSHOT |
+| aarch64_generic | SNAPSHOT |
 
 --------------
 
 ## Notes
 
-- Netdata web interface is available at `http://<router-ip>:19999`
+- Netdata web interface is available at `http://<router-ip>:19999/v3/`
 - Access via LuCI: `System → Netdata`
 - Health monitoring is disabled by default to reduce resource usage
 - Python/cgroups/apps plugins are disabled by default

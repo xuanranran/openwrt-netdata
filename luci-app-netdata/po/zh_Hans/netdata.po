@@ -2,69 +2,13 @@ msgid ""
 msgstr "Content-Type: text/plain; charset=UTF-8\n"
 
 #: applications/luci-app-netdata/root/usr/share/rpcd/acl.d/luci-app-netdata.json:3
-msgid "Grant access for luci-app-netdata"
-msgstr "授予 luci-app-netdata 所需访问权限"
+msgid "Grant UCI access for luci-app-netdata"
+msgstr "授予 luci-app-netdata 访问 UCI 配置的权限"
 
 #: applications/luci-app-netdata/root/usr/share/luci/menu.d/luci-app-netdata.json:3
 msgid "Netdata"
 msgstr "Netdata"
 
-msgid "Token and rooms are required."
-msgstr "Token 和 Rooms 不能为空。"
-
-msgid "Saving"
-msgstr "正在保存"
-
-msgid "Saving cloud configuration and restarting Netdata..."
-msgstr "正在保存云配置并重启 Netdata..."
-
-msgid "Unable to save cloud configuration."
-msgstr "无法保存云配置。"
-
-msgid "Cloud configuration saved and Netdata restarted."
-msgstr "云配置已保存，Netdata 已重启。"
-
-msgid "Cloud Configuration"
-msgstr "云配置"
-
-msgid "Claim token"
-msgstr "Claim Token"
-
-msgid "Paste claim token"
-msgstr "粘贴 Claim Token"
-
-msgid "Rooms"
-msgstr "Rooms"
-
-msgid "Paste room id"
-msgstr "粘贴 Room ID"
-
-msgid "Cancel"
-msgstr "取消"
-
-msgid "Save & Apply"
-msgstr "保存并应用"
-
-msgid "Status"
-msgstr "状态"
-
-msgid "V3 Dashboard"
-msgstr "V3 面板"
-
-msgid "Netdata Cloud"
-msgstr "Netdata Cloud"
-
-msgid "Configure the claim token and room id stored in /etc/netdata/claim.conf."
-msgstr "配置保存在 /etc/netdata/claim.conf 中的 Claim Token 和 Room ID。"
-
-msgid "Cloud URL"
-msgstr "Cloud URL"
-
-msgid "Configured"
-msgstr "已配置"
-
-msgid "Not configured"
-msgstr "未配置"
-
-msgid "Edit Cloud Configuration"
-msgstr "编辑云配置"
+#: applications/luci-app-netdata/htdocs/luci-static/resources/view/netdata.js:10
+msgid "Netdata Dashboard"
+msgstr "Netdata 仪表盘"

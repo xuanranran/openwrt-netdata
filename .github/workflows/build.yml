@@ -7,14 +7,12 @@ on:
       - master
     paths:
       - 'netdata/**'
-      - 'netdata-dashboard-v1/**'
       - 'netdata-dashboard-v3/**'
       - 'luci-app-netdata/**'
       - '.github/workflows/build.yml'
   pull_request:
     paths:
       - 'netdata/**'
-      - 'netdata-dashboard-v1/**'
       - 'netdata-dashboard-v3/**'
       - 'luci-app-netdata/**'
       - '.github/workflows/build.yml'
@@ -50,7 +48,7 @@ jobs:
         env:
           ARCH: ${{ matrix.arch }}-${{ matrix.sdk }}
           NO_SHFMT_CHECK: true
-          PACKAGES: netdata netdata-dashboard-v1 luci-app-netdata netdata-dashboard-v3
+          PACKAGES: netdata netdata-dashboard-v3 luci-app-netdata
           V: sc
 
       - name: Show refreshed patch diff (dirty patch debug)
@@ -95,16 +93,7 @@ jobs:
 
           TAR_NAME="netdata-${{ matrix.arch }}-${{ matrix.sdk }}.tar.gz"
           cd bin/artifacts && tar -czvf "../../$TAR_NAME" * && cd ../..
-          LITE_TAR_NAME="netdata-lite-${{ matrix.arch }}-${{ matrix.sdk }}.tar.gz"
-          mkdir -p bin/artifacts-lite
-          find bin/artifacts -maxdepth 1 -type f \
-            ! -name "netdata-dashboard*" \
-            ! -name "luci-app-netdata*" \
-            ! -name "luci-i18n-netdata*" \
-            -exec cp -n {} bin/artifacts-lite/ \;
-          cd bin/artifacts-lite && tar -czvf "../../$LITE_TAR_NAME" * && cd ../..
           mkdir -p upload && mv "$TAR_NAME" upload/
-          mv "$LITE_TAR_NAME" upload/
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
