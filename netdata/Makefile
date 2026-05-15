@@ -131,6 +131,10 @@ define Package/netdata/install
 		$(INSTALL_DIR) $(1)/usr/share; \
 		$(CP) $(PKG_INSTALL_DIR)/usr/share/netdata $(1)/usr/share; \
 	fi
+	if [ ! -d $(1)/usr/share/netdata/web/v1 ] && [ -d $(PKG_BUILD_DIR)/src/web/gui/v1 ]; then \
+		$(INSTALL_DIR) $(1)/usr/share/netdata/web; \
+		$(CP) $(PKG_BUILD_DIR)/src/web/gui/v1 $(1)/usr/share/netdata/web; \
+	fi
 	if [ ! -f $(1)/usr/share/netdata/web/index.html ]; then \
 		$(INSTALL_DIR) $(1)/usr/share/netdata/web; \
 		$(INSTALL_DATA) ./files/web-index.html $(1)/usr/share/netdata/web/index.html; \
