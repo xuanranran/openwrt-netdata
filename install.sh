@@ -227,6 +227,19 @@ is_force_package() {
     esac
 }
 
+is_blocked_package() {
+    local pkg="$1"
+
+    case "$pkg" in
+        libopenssl-padlock)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 is_package_installed() {
     local pkg="$1"
 
@@ -239,16 +252,20 @@ is_package_installed() {
 
 select_install_files() {
     local pattern="$1"
-    local file pkg selected skipped forced
+    local file pkg selected skipped forced blocked
 
     selected=""
     skipped=""
     forced=""
+    blocked=""
 
     for file in $(find . -maxdepth 1 -type f -name "$pattern" | sort); do
         pkg=$(package_name_from_file "$file")
 
-        if is_force_package "$pkg"; then
+        if is_blocked_package "$pkg"; then
+            blocked="${blocked}${pkg}
+"
+        elif is_force_package "$pkg"; then
             selected="${selected}${file}
 "
             forced="${forced}${pkg}
@@ -261,6 +278,11 @@ select_install_files() {
 "
         fi
     done
+
+    if [ -n "$blocked" ]; then
+        print_warn "以下可选软件包将跳过:"
+        printf "%s" "$blocked" | sed '/^$/d; s/^/  - /' >&2
+    fi
 
     if [ -n "$skipped" ]; then
         print_info "以下已安装依赖将跳过:"
