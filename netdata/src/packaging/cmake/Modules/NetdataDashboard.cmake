@@ -20,40 +20,47 @@ endfunction()
 
 # Bundle the dashboard code for inclusion during install.
 #
-# OpenWrt builds should not fail just because the remote dashboard bundle is
-# temporarily unavailable. If the prebuilt v3 dashboard cannot be fetched, keep
-# configuring so the dashboard files shipped in the Netdata source tree are
-# still installed.
+# OpenWrt builds should not fail just because the remote v3 dashboard bundle is
+# temporarily unavailable. If the fetch fails, the package install step adds a
+# root index that opens the dashboard files shipped in the Netdata source tree.
 function(bundle_dashboard)
   include(ExternalProject)
 
   set(dashboard_src_dir "${CMAKE_BINARY_DIR}/dashboard-src")
   set(dashboard_src_prefix "${dashboard_src_dir}/dist/agent")
   set(dashboard_bin_dir "${CMAKE_BINARY_DIR}/dashboard-bin")
+  set(DASHBOARD_TARBALL "" CACHE FILEPATH
+      "Path to a pre-downloaded local agent dashboard tarball")
   set(DASHBOARD_URL "https://app.netdata.cloud/agent.tar.gz" CACHE STRING
       "URL used to fetch the local agent dashboard code")
 
   message(STATUS "Preparing local agent dashboard code")
 
-  message(STATUS "  Fetching ${DASHBOARD_URL}")
-  file(DOWNLOAD
-       "${DASHBOARD_URL}"
-       "${CMAKE_BINARY_DIR}/dashboard.tar.gz"
-       TIMEOUT 180
-       STATUS fetch_status)
-
-  list(GET fetch_status 0 result)
-
-  if(result)
-    message(WARNING "Failed to fetch bundled v3 dashboard code; continuing with dashboard files from the source tree")
-    return()
+  if(DASHBOARD_TARBALL AND EXISTS "${DASHBOARD_TARBALL}")
+    message(STATUS "  Using pre-downloaded dashboard code from ${DASHBOARD_TARBALL}")
+    set(dashboard_archive "${DASHBOARD_TARBALL}")
   else()
-    message(STATUS "  Fetching ${DASHBOARD_URL} -- Done")
+    set(dashboard_archive "${CMAKE_BINARY_DIR}/dashboard.tar.gz")
+    message(STATUS "  Fetching ${DASHBOARD_URL}")
+    file(DOWNLOAD
+         "${DASHBOARD_URL}"
+         "${dashboard_archive}"
+         TIMEOUT 180
+         STATUS fetch_status)
+
+    list(GET fetch_status 0 result)
+
+    if(result)
+      message(WARNING "Failed to fetch bundled v3 dashboard code; continuing with dashboard files from the source tree")
+      return()
+    else()
+      message(STATUS "  Fetching ${DASHBOARD_URL} -- Done")
+    endif()
   endif()
 
   message(STATUS "  Extracting dashboard code")
   extract_gzipped_tarball(
-    "${CMAKE_BINARY_DIR}/dashboard.tar.gz"
+    "${dashboard_archive}"
     "${dashboard_src_dir}"
   )
   message(STATUS "  Extracting dashboard code -- Done")

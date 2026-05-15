@@ -2,5 +2,6 @@
 .github/workflows/*.yml text eol=lf
 install.sh text eol=lf
 netdata/Makefile text eol=lf
+netdata/files/** text eol=lf
 netdata/patches/*.patch text eol=lf
 netdata/src/** text eol=lf

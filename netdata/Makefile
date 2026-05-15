@@ -31,7 +31,6 @@ include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/cmake.mk
 include $(INCLUDE_DIR)/nls.mk
 
-
 define Package/netdata
   SECTION:=admin
   CATEGORY:=Administration
@@ -110,6 +109,10 @@ define Package/netdata/install
 	if [ -d $(PKG_INSTALL_DIR)/usr/share/netdata ]; then \
 		$(INSTALL_DIR) $(1)/usr/share; \
 		$(CP) $(PKG_INSTALL_DIR)/usr/share/netdata $(1)/usr/share; \
+	fi
+	if [ ! -f $(1)/usr/share/netdata/web/index.html ]; then \
+		$(INSTALL_DIR) $(1)/usr/share/netdata/web; \
+		$(INSTALL_DATA) ./files/web-index.html $(1)/usr/share/netdata/web/index.html; \
 	fi
 
 endef
