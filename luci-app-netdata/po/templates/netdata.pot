@@ -9,12 +9,6 @@ msgstr ""
 msgid "Netdata"
 msgstr ""
 
-msgid "running"
-msgstr ""
-
-msgid "not running"
-msgstr ""
-
 msgid "Token and rooms are required."
 msgstr ""
 
@@ -55,12 +49,6 @@ msgid "Status"
 msgstr ""
 
 msgid "V3 Dashboard"
-msgstr ""
-
-msgid "Netdata is %s"
-msgstr ""
-
-msgid "Open V1 Dashboard"
 msgstr ""
 
 msgid "Netdata Cloud"

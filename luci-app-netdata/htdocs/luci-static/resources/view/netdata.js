@@ -56,10 +56,6 @@ function dashboardFrame(path) {
 	}, null);
 }
 
-function statusText(status) {
-	return status && status.code == 0 ? _('running') : _('not running');
-}
-
 function saveCloudConfig() {
 	var token = document.getElementById('netdata-claim-token').value.trim();
 	var rooms = document.getElementById('netdata-claim-rooms').value.trim();
@@ -131,15 +127,13 @@ return view.extend({
 	load: function() {
 		return Promise.all([
 			L.resolveDefault(fs.stat('/usr/share/netdata/web/v3/index.html'), null),
-			L.resolveDefault(fs.exec(helper, [ 'status' ]), { code: 1, stdout: '' }),
 			L.resolveDefault(fs.exec(helper, [ 'claim-read' ]), { code: 1, stdout: '' })
 		]);
 	},
 
 	render: function(data) {
 		var hasV3 = data[0] != null;
-		var status = data[1];
-		var claim = parseClaimConfig(data[2].stdout);
+		var claim = parseClaimConfig(data[1].stdout);
 
 		return E('div', { 'class': 'cbi-map' }, [
 			E('h2', { 'name': 'content' }, _('Netdata')),
@@ -149,21 +143,6 @@ return view.extend({
 				tabButton('cloud', _('Cloud Configuration'), false)
 			]),
 			E('div', { 'class': 'cbi-section', 'data-netdata-pane': 'status' }, [
-				E('div', { 'class': 'table cbi-section-table' }, [
-					E('div', { 'class': 'tr cbi-section-table-row' }, [
-						E('div', { 'class': 'td left' }, [
-							E('strong', _('Netdata is %s').format(statusText(status)))
-						]),
-						E('div', { 'class': 'td right' }, [
-							E('a', {
-								'class': 'btn cbi-button',
-								'href': netdataUrl + '/v1/',
-								'target': '_blank',
-								'rel': 'noreferrer'
-							}, _('Open V1 Dashboard'))
-						])
-					])
-				]),
 				dashboardFrame('/v1/')
 			]),
 			hasV3 ? E('div', {

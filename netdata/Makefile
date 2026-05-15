@@ -63,7 +63,7 @@ define Package/netdata
   URL:=https://www.netdata.cloud/
 endef
 
-define Package/netdata-dashboard
+define Package/netdata-dashboard-v3
   SECTION:=admin
   CATEGORY:=Administration
   DEPENDS:=+netdata
@@ -87,7 +87,7 @@ define Package/netdata/description
   python3-urllib3
 endef
 
-define Package/netdata-dashboard/description
+define Package/netdata-dashboard-v3/description
   Local v3 dashboard assets for the Netdata web UI.
 endef
 
@@ -168,7 +168,7 @@ define Package/netdata/install
 
 endef
 
-define Package/netdata-dashboard/install
+define Package/netdata-dashboard-v3/install
 	#netdata webdir
 	if [ -d $(PKG_INSTALL_DIR)/usr/share/netdata ]; then \
 		$(INSTALL_DIR) $(1)/usr/share; \
@@ -181,6 +181,11 @@ define Package/netdata-dashboard/install
 endef
 
 define Package/netdata-dashboard-v1/install
+	$(INSTALL_DIR) $(1)/usr/share/netdata/web
+	$(TAR) -xzf $(DL_DIR)/$(DASHBOARD_V1_SOURCE) \
+		-C $(1)/usr/share/netdata/web \
+		--strip-components=4 \
+		$(PKG_NAME)-v$(DASHBOARD_V1_VERSION)/src/web/gui/dashboard_info.js
 	$(INSTALL_DIR) $(1)/usr/share/netdata/web/v1
 	$(TAR) -xzf $(DL_DIR)/$(DASHBOARD_V1_SOURCE) \
 		-C $(1)/usr/share/netdata/web/v1 \
@@ -192,5 +197,5 @@ define Package/netdata-dashboard-v1/install
 endef
 
 $(eval $(call BuildPackage,netdata))
-$(eval $(call BuildPackage,netdata-dashboard))
+$(eval $(call BuildPackage,netdata-dashboard-v3))
 $(eval $(call BuildPackage,netdata-dashboard-v1))

@@ -9,12 +9,6 @@ msgstr "授予 luci-app-netdata 所需访问权限"
 msgid "Netdata"
 msgstr "Netdata"
 
-msgid "running"
-msgstr "运行中"
-
-msgid "not running"
-msgstr "未运行"
-
 msgid "Token and rooms are required."
 msgstr "Token 和 Rooms 不能为空。"
 
@@ -56,12 +50,6 @@ msgstr "状态"
 
 msgid "V3 Dashboard"
 msgstr "V3 面板"
-
-msgid "Netdata is %s"
-msgstr "Netdata %s"
-
-msgid "Open V1 Dashboard"
-msgstr "打开 V1 面板"
 
 msgid "Netdata Cloud"
 msgstr "Netdata Cloud"

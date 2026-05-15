@@ -47,7 +47,7 @@ jobs:
         env:
           ARCH: ${{ matrix.arch }}-${{ matrix.sdk }}
           NO_SHFMT_CHECK: true
-          PACKAGES: netdata luci-app-netdata
+          PACKAGES: netdata luci-app-netdata netdata-dashboard-v3
           V: sc
 
       - name: Show refreshed patch diff (dirty patch debug)
