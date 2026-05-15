@@ -28,7 +28,7 @@ return view.extend({
 				}, _('Open V1 Dashboard'))
 			]),
 			E('iframe', {
-				'src': origin + '/v1/',
+				'src': origin + '/v3/',
 				'style': 'width: 100%; min-height: 1200px; border: none; border-radius: 3px; resize: vertical;'
 			}, null)
 		]);
