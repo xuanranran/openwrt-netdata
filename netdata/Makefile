@@ -21,11 +21,6 @@ PKG_SOURCE_URL:=https://github.com/netdata/netdata/releases/download/v$(PKG_VERS
 PKG_HASH:=d7f178b89dc327f4f761aeaf5bd6e76a13ba220497c64c30f587f98ddc65b42b
 PKG_BUILD_DIR=$(BUILD_DIR)/$(PKG_NAME)-v$(PKG_VERSION)
 
-DASHBOARD_V1_VERSION:=2.2.6
-DASHBOARD_V1_SOURCE:=$(PKG_NAME)-dashboard-v1-v$(DASHBOARD_V1_VERSION).tar.gz
-DASHBOARD_V1_SOURCE_URL:=https://github.com/netdata/netdata/releases/download/v$(DASHBOARD_V1_VERSION)
-DASHBOARD_V1_HASH:=bd98c146aa6d0c25f80cb50b1447b8aca8a17f0995b28a11a23e843b8f210f42
-
 PKG_INSTALL:=1
 PKG_BUILD_PARALLEL:=1
 PKG_BUILD_FLAGS:=no-mips16 gc-sections
@@ -36,27 +31,11 @@ include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/cmake.mk
 include $(INCLUDE_DIR)/nls.mk
 
-define Download/netdata-dashboard-v1
-  FILE:=$(DASHBOARD_V1_SOURCE)
-  URL:=$(DASHBOARD_V1_SOURCE_URL)
-  URL_FILE:=$(PKG_NAME)-v$(DASHBOARD_V1_VERSION).tar.gz
-  HASH:=$(DASHBOARD_V1_HASH)
-endef
-$(eval $(call Download,netdata-dashboard-v1))
-
 define Package/netdata
   SECTION:=admin
   CATEGORY:=Administration
   DEPENDS:=+zlib +libstdcpp +libuuid +libuv +libmnl +liblz4 +libjson-c +libyaml +libopenssl +libcurl +protobuf +libzstd
   TITLE:=Real-time performance monitoring tool
-  URL:=https://www.netdata.cloud/
-endef
-
-define Package/netdata-dashboard-v1
-  SECTION:=admin
-  CATEGORY:=Administration
-  DEPENDS:=+netdata
-  TITLE:=Local Netdata v1 dashboard
   URL:=https://www.netdata.cloud/
 endef
 
@@ -66,10 +45,6 @@ define Package/netdata/description
 
   If you want to use Python plugins install python3, python3-yaml and
   python3-urllib3
-endef
-
-define Package/netdata-dashboard-v1/description
-  Local legacy v1 dashboard assets for the Netdata web UI.
 endef
 
 TARGET_CFLAGS := $(filter-out -O%,$(TARGET_CFLAGS)) -O3
@@ -144,21 +119,4 @@ define Package/netdata/install
 
 endef
 
-define Package/netdata-dashboard-v1/install
-	$(INSTALL_DIR) $(1)/usr/share/netdata/web
-	$(TAR) -xzf $(DL_DIR)/$(DASHBOARD_V1_SOURCE) \
-		-C $(1)/usr/share/netdata/web \
-		--strip-components=4 \
-		$(PKG_NAME)-v$(DASHBOARD_V1_VERSION)/src/web/gui/dashboard_info.js
-	$(INSTALL_DIR) $(1)/usr/share/netdata/web/v1
-	$(TAR) -xzf $(DL_DIR)/$(DASHBOARD_V1_SOURCE) \
-		-C $(1)/usr/share/netdata/web/v1 \
-		--strip-components=5 \
-		$(PKG_NAME)-v$(DASHBOARD_V1_VERSION)/src/web/gui/v1
-	find $(1)/usr/share/netdata/web/v1 -name '*.map' -delete
-	rm -f $(1)/usr/share/netdata/web/v1/dashboard_v1.cmake
-	rm -f $(1)/usr/share/netdata/web/v1/README.md
-endef
-
 $(eval $(call BuildPackage,netdata))
-$(eval $(call BuildPackage,netdata-dashboard-v1))

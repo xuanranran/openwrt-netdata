@@ -7,12 +7,14 @@ on:
       - master
     paths:
       - 'netdata/**'
+      - 'netdata-dashboard-v1/**'
       - 'netdata-dashboard-v3/**'
       - 'luci-app-netdata/**'
       - '.github/workflows/build.yml'
   pull_request:
     paths:
       - 'netdata/**'
+      - 'netdata-dashboard-v1/**'
       - 'netdata-dashboard-v3/**'
       - 'luci-app-netdata/**'
       - '.github/workflows/build.yml'
@@ -26,14 +28,6 @@ on:
           - all
           - x86_64
           - aarch64_generic
-      sdk:
-        description: OpenWrt SDK
-        type: choice
-        default: stable
-        options:
-          - stable
-          - snapshot
-          - all
 
 permissions:
   contents: write
@@ -54,10 +48,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             ARCH_INPUT="${{ inputs.arch }}"
-            SDK_INPUT="${{ inputs.sdk }}"
           else
             ARCH_INPUT="all"
-            SDK_INPUT="stable"
           fi
 
           case "$ARCH_INPUT" in
@@ -66,12 +58,7 @@ jobs:
             *) echo "::error::Invalid arch input: $ARCH_INPUT"; exit 1 ;;
           esac
 
-          case "$SDK_INPUT" in
-            stable) sdks=("24.10.4") ;;
-            snapshot) sdks=("SNAPSHOT") ;;
-            all) sdks=("24.10.4" "SNAPSHOT") ;;
-            *) echo "::error::Invalid sdk input: $SDK_INPUT"; exit 1 ;;
-          esac
+          sdks=("SNAPSHOT")
 
           includes=''
           for arch in "${arches[@]}"; do
@@ -106,7 +93,7 @@ jobs:
         env:
           ARCH: ${{ matrix.arch }}-${{ matrix.sdk }}
           NO_SHFMT_CHECK: true
-          PACKAGES: netdata luci-app-netdata netdata-dashboard-v3
+          PACKAGES: netdata netdata-dashboard-v1 luci-app-netdata netdata-dashboard-v3
           V: sc
 
       - name: Show refreshed patch diff (dirty patch debug)
