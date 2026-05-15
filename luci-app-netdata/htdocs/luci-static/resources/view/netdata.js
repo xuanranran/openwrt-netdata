@@ -136,12 +136,12 @@ return view.extend({
 		var claim = parseClaimConfig(data[1].stdout);
 
 		return E('div', { 'class': 'cbi-map' }, [
-			E('h2', { 'name': 'content' }, _('Netdata')),
 			E('ul', { 'class': 'cbi-tabmenu' }, [
 				tabButton('status', _('Status'), true),
 				hasV3 ? tabButton('v3', _('V3 Dashboard'), false) : '',
 				tabButton('cloud', _('Cloud Configuration'), false)
 			]),
+			E('h2', { 'name': 'content' }, _('Netdata')),
 			E('div', { 'class': 'cbi-section', 'data-netdata-pane': 'status' }, [
 				dashboardFrame('/v1/')
 			]),
