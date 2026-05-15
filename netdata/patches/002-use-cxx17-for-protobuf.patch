@@ -1,6 +1,6 @@
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -34,7 +34,7 @@ endif()
+@@ -39,7 +39,7 @@ endif()
  set(CMAKE_INSTALL_MESSAGE LAZY)
  
  set(CMAKE_C_STANDARD 11)
