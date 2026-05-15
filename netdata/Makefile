@@ -21,9 +21,6 @@ PKG_SOURCE_URL:=https://github.com/netdata/netdata/releases/download/v$(PKG_VERS
 PKG_HASH:=d7f178b89dc327f4f761aeaf5bd6e76a13ba220497c64c30f587f98ddc65b42b
 PKG_BUILD_DIR=$(BUILD_DIR)/$(PKG_NAME)-v$(PKG_VERSION)
 
-DASHBOARD_SOURCE:=$(PKG_NAME)-dashboard-v$(PKG_VERSION).tar.gz
-DASHBOARD_SOURCE_URL:=https://app.netdata.cloud
-DASHBOARD_HASH:=0a175680392e20c2bb9737c31f4610d4169a144ef93cd60b0626e3d9a23ecda7
 DASHBOARD_V1_VERSION:=2.2.6
 DASHBOARD_V1_SOURCE:=$(PKG_NAME)-dashboard-v1-v$(DASHBOARD_V1_VERSION).tar.gz
 DASHBOARD_V1_SOURCE_URL:=https://github.com/netdata/netdata/releases/download/v$(DASHBOARD_V1_VERSION)
@@ -39,14 +36,6 @@ include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/cmake.mk
 include $(INCLUDE_DIR)/nls.mk
 
-define Download/netdata-dashboard
-  FILE:=$(DASHBOARD_SOURCE)
-  URL:=$(DASHBOARD_SOURCE_URL)
-  URL_FILE:=agent.tar.gz
-  HASH:=$(DASHBOARD_HASH)
-endef
-$(eval $(call Download,netdata-dashboard))
-
 define Download/netdata-dashboard-v1
   FILE:=$(DASHBOARD_V1_SOURCE)
   URL:=$(DASHBOARD_V1_SOURCE_URL)
@@ -60,14 +49,6 @@ define Package/netdata
   CATEGORY:=Administration
   DEPENDS:=+zlib +libstdcpp +libuuid +libuv +libmnl +liblz4 +libjson-c +libyaml +libopenssl +libcurl +protobuf +libzstd
   TITLE:=Real-time performance monitoring tool
-  URL:=https://www.netdata.cloud/
-endef
-
-define Package/netdata-dashboard-v3
-  SECTION:=admin
-  CATEGORY:=Administration
-  DEPENDS:=+netdata
-  TITLE:=Local Netdata v3 dashboard
   URL:=https://www.netdata.cloud/
 endef
 
@@ -87,10 +68,6 @@ define Package/netdata/description
   python3-urllib3
 endef
 
-define Package/netdata-dashboard-v3/description
-  Local v3 dashboard assets for the Netdata web UI.
-endef
-
 define Package/netdata-dashboard-v1/description
   Local legacy v1 dashboard assets for the Netdata web UI.
 endef
@@ -101,9 +78,8 @@ TARGET_LDFLAGS += -L$(STAGING_DIR)/usr/lib
 CMAKE_OPTIONS += \
 	-DCMAKE_INSTALL_PREFIX="/" \
 	-DCMAKE_CROSSCOMPILING=True \
-	-DDASHBOARD_TARBALL=$(DL_DIR)/$(DASHBOARD_SOURCE) \
 	-DProtobuf_PROTOC_EXECUTABLE=$(STAGING_DIR_HOSTPKG)/bin/protoc \
-	-DENABLE_DASHBOARD=On \
+	-DENABLE_DASHBOARD=Off \
 	-DENABLE_DBENGINE=On \
 	-DENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE=Off \
 	-DENABLE_EXPORTER_MONGODB=Off \
@@ -168,18 +144,6 @@ define Package/netdata/install
 
 endef
 
-define Package/netdata-dashboard-v3/install
-	#netdata webdir
-	if [ -d $(PKG_INSTALL_DIR)/usr/share/netdata ]; then \
-		$(INSTALL_DIR) $(1)/usr/share; \
-		$(CP) $(PKG_INSTALL_DIR)/usr/share/netdata $(1)/usr/share; \
-	fi
-	if [ ! -f $(1)/usr/share/netdata/web/index.html ]; then \
-		$(INSTALL_DIR) $(1)/usr/share/netdata/web; \
-		$(INSTALL_DATA) ./files/web-index.html $(1)/usr/share/netdata/web/index.html; \
-	fi
-endef
-
 define Package/netdata-dashboard-v1/install
 	$(INSTALL_DIR) $(1)/usr/share/netdata/web
 	$(TAR) -xzf $(DL_DIR)/$(DASHBOARD_V1_SOURCE) \
@@ -197,5 +161,4 @@ define Package/netdata-dashboard-v1/install
 endef
 
 $(eval $(call BuildPackage,netdata))
-$(eval $(call BuildPackage,netdata-dashboard-v3))
 $(eval $(call BuildPackage,netdata-dashboard-v1))

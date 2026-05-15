@@ -7,14 +7,33 @@ on:
       - master
     paths:
       - 'netdata/**'
+      - 'netdata-dashboard-v3/**'
       - 'luci-app-netdata/**'
       - '.github/workflows/build.yml'
   pull_request:
     paths:
       - 'netdata/**'
+      - 'netdata-dashboard-v3/**'
       - 'luci-app-netdata/**'
       - '.github/workflows/build.yml'
   workflow_dispatch:
+    inputs:
+      arch:
+        description: Target architecture
+        type: choice
+        default: all
+        options:
+          - all
+          - x86_64
+          - aarch64_generic
+      sdk:
+        description: OpenWrt SDK
+        type: choice
+        default: stable
+        options:
+          - stable
+          - snapshot
+          - all
 
 permissions:
   contents: write
@@ -24,19 +43,59 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  select-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Select build matrix
+        id: matrix
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ARCH_INPUT="${{ inputs.arch }}"
+            SDK_INPUT="${{ inputs.sdk }}"
+          else
+            ARCH_INPUT="all"
+            SDK_INPUT="stable"
+          fi
+
+          case "$ARCH_INPUT" in
+            all) arches=("x86_64" "aarch64_generic") ;;
+            x86_64|aarch64_generic) arches=("$ARCH_INPUT") ;;
+            *) echo "::error::Invalid arch input: $ARCH_INPUT"; exit 1 ;;
+          esac
+
+          case "$SDK_INPUT" in
+            stable) sdks=("24.10.4") ;;
+            snapshot) sdks=("SNAPSHOT") ;;
+            all) sdks=("24.10.4" "SNAPSHOT") ;;
+            *) echo "::error::Invalid sdk input: $SDK_INPUT"; exit 1 ;;
+          esac
+
+          includes=''
+          for arch in "${arches[@]}"; do
+            for sdk in "${sdks[@]}"; do
+              entry="{\"arch\":\"$arch\",\"sdk\":\"$sdk\"}"
+              if [ -n "$includes" ]; then
+                includes="$includes,$entry"
+              else
+                includes="$entry"
+              fi
+            done
+          done
+
+          matrix="{\"include\":[$includes]}"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "$matrix"
+
   build:
     name: Package ${{ matrix.arch }}-${{ matrix.sdk }}
+    needs: select-matrix
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        arch:
-          - x86_64
-          - aarch64_generic
-
-        sdk:
-          - "24.10.4"
-          - "SNAPSHOT"
+      matrix: ${{ fromJson(needs.select-matrix.outputs.matrix) }}
 
     steps:
       - name: Checkout repository
