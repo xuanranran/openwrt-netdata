@@ -81,6 +81,22 @@ define Package/netdata/conffiles
 /etc/netdata/
 endef
 
+define Package/netdata/postinst
+#!/bin/sh
+[ -n "$${IPKG_INSTROOT}" ] && exit 0
+/etc/init.d/netdata enable
+/etc/init.d/netdata start
+exit 0
+endef
+
+define Package/netdata/prerm
+#!/bin/sh
+[ -n "$${IPKG_INSTROOT}" ] && exit 0
+/etc/init.d/netdata stop
+/etc/init.d/netdata disable
+exit 0
+endef
+
 define Package/netdata/install
 	#netdata binary
 	$(INSTALL_DIR) $(1)/usr/sbin

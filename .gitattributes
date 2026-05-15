@@ -1,5 +1,8 @@
 /.gitattributes text eol=lf
 .github/workflows/*.yml text eol=lf
+luci-app-netdata/htdocs/**/*.js text eol=lf
+luci-app-netdata/root/**/*.json text eol=lf
 netdata/Makefile text eol=lf
+netdata/files/* text eol=lf
 netdata/patches/*.patch text eol=lf
 netdata/src/** text eol=lf
