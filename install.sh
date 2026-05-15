@@ -195,6 +195,86 @@ check_installed() {
     fi
 }
 
+package_name_from_file() {
+    local file="$1"
+    local base="${file##*/}"
+
+    case "$base" in
+        *.ipk)
+            base="${base%.ipk}"
+            echo "${base%%_*}"
+            ;;
+        *.apk)
+            base="${base%.apk}"
+            echo "$base" | sed -E 's/-[0-9][^-]*-r[0-9].*$//'
+            ;;
+        *)
+            echo "$base"
+            ;;
+    esac
+}
+
+is_force_package() {
+    local pkg="$1"
+
+    case "$pkg" in
+        protobuf|protobuf-lite|*netdata*)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+is_package_installed() {
+    local pkg="$1"
+
+    if [ "$PKG_MANAGER" = "apk" ]; then
+        apk info -e "$pkg" >/dev/null 2>&1
+    else
+        opkg list-installed "$pkg" 2>/dev/null | grep -q "^${pkg} -"
+    fi
+}
+
+select_install_files() {
+    local pattern="$1"
+    local file pkg selected skipped forced
+
+    selected=""
+    skipped=""
+    forced=""
+
+    for file in $(find . -maxdepth 1 -type f -name "$pattern" | sort); do
+        pkg=$(package_name_from_file "$file")
+
+        if is_force_package "$pkg"; then
+            selected="${selected}${file}
+"
+            forced="${forced}${pkg}
+"
+        elif is_package_installed "$pkg"; then
+            skipped="${skipped}${pkg}
+"
+        else
+            selected="${selected}${file}
+"
+        fi
+    done
+
+    if [ -n "$skipped" ]; then
+        print_info "以下已安装依赖将跳过:"
+        printf "%s" "$skipped" | sed '/^$/d; s/^/  - /' >&2
+    fi
+
+    if [ -n "$forced" ]; then
+        print_info "以下关键软件包将强制安装:"
+        printf "%s" "$forced" | sed '/^$/d; s/^/  - /' >&2
+    fi
+
+    printf "%s" "$selected" | sed '/^$/d'
+}
+
 install_local_packages() {
     print_info "开始安装本地软件包..."
 
@@ -202,25 +282,35 @@ install_local_packages() {
 
     if [ "$PKG_MANAGER" = "apk" ]; then
         local apk_files
-        apk_files=$(find . -maxdepth 1 -type f -name "*.apk" | sort)
-
-        if [ -z "$apk_files" ]; then
+        if [ -z "$(find . -maxdepth 1 -type f -name "*.apk" | head -n 1)" ]; then
             print_error "解压目录中未找到 .apk 软件包"
             exit 1
+        fi
+
+        apk_files=$(select_install_files "*.apk")
+
+        if [ -z "$apk_files" ]; then
+            print_info "所有非关键 APK 依赖均已安装，无需重复安装"
+            return 0
         fi
 
         print_info "将安装以下 APK 软件包:"
         echo "$apk_files" | sed 's#^\./#  - #' >&2
 
         # shellcheck disable=SC2086
-        apk add --allow-untrusted $apk_files
+        apk add --allow-untrusted --force-overwrite --upgrade $apk_files
     else
         local ipk_files
-        ipk_files=$(find . -maxdepth 1 -type f -name "*.ipk" | sort)
-
-        if [ -z "$ipk_files" ]; then
+        if [ -z "$(find . -maxdepth 1 -type f -name "*.ipk" | head -n 1)" ]; then
             print_error "解压目录中未找到 .ipk 软件包"
             exit 1
+        fi
+
+        ipk_files=$(select_install_files "*.ipk")
+
+        if [ -z "$ipk_files" ]; then
+            print_info "所有非关键 IPK 依赖均已安装，无需重复安装"
+            return 0
         fi
 
         print_info "将安装以下 IPK 软件包:"
@@ -228,7 +318,7 @@ install_local_packages() {
 
         # 一次性传入全部本地包，让 opkg 能在本地文件之间解析依赖。
         # shellcheck disable=SC2086
-        opkg install --force-downgrade $ipk_files
+        opkg install --force-downgrade --force-reinstall $ipk_files
     fi
 }
 
