@@ -170,6 +170,43 @@ check_installed() {
     fi
 }
 
+install_local_packages() {
+    print_info "开始安装本地软件包..."
+
+    cd "$TMP_DIR"
+
+    if [ "$PKG_MANAGER" = "apk" ]; then
+        local apk_files
+        apk_files=$(find . -maxdepth 1 -type f -name "*.apk" | sort)
+
+        if [ -z "$apk_files" ]; then
+            print_error "解压目录中未找到 .apk 软件包"
+            exit 1
+        fi
+
+        print_info "将安装以下 APK 软件包:"
+        echo "$apk_files" | sed 's#^\./#  - #' >&2
+
+        # shellcheck disable=SC2086
+        apk add --allow-untrusted $apk_files
+    else
+        local ipk_files
+        ipk_files=$(find . -maxdepth 1 -type f -name "*.ipk" | sort)
+
+        if [ -z "$ipk_files" ]; then
+            print_error "解压目录中未找到 .ipk 软件包"
+            exit 1
+        fi
+
+        print_info "将安装以下 IPK 软件包:"
+        echo "$ipk_files" | sed 's#^\./#  - #' >&2
+
+        # 一次性传入全部本地包，让 opkg 能在本地文件之间解析依赖。
+        # shellcheck disable=SC2086
+        opkg install --force-downgrade $ipk_files
+    fi
+}
+
 # 获取 CPU 架构
 get_cpu_arch() {
     print_info "检测 CPU 架构..."
@@ -319,23 +356,7 @@ download_and_install() {
     print_info "解压..."
     tar -zxf "$output" -C "$TMP_DIR"
 
-    print_info "开始安装..."
-
-    if [ "$PKG_MANAGER" = "apk" ]; then
-        cd "$TMP_DIR"
-        for apk_file in *netdata*.apk; do
-            [ -f "$apk_file" ] && apk add --allow-untrusted "$apk_file" || true
-        done
-    else
-        cd "$TMP_DIR"
-        # 先安装 netdata 主包，再安装 luci-app-netdata
-        for ipk in netdata_*.ipk; do
-            [ -f "$ipk" ] && opkg install --force-downgrade "$ipk"
-        done
-        for ipk in luci-app-netdata*.ipk; do
-            [ -f "$ipk" ] && opkg install --force-downgrade "$ipk"
-        done
-    fi
+    install_local_packages
 
     print_info "安装完成"
 
