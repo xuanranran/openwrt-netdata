@@ -1,3 +1,4 @@
 /.gitattributes text eol=lf
+netdata/Makefile text eol=lf
 netdata/patches/*.patch text eol=lf
 netdata/src/** text eol=lf
