@@ -19,6 +19,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Package ${{ matrix.arch }}-${{ matrix.sdk }}
@@ -77,6 +81,8 @@ jobs:
         with:
           name: package-${{ matrix.arch }}-${{ matrix.sdk }}
           path: upload/*.tar.gz
+          overwrite: true
+          retention-days: 3
           if-no-files-found: ignore
 
       - name: Get Version
