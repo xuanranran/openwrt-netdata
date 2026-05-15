@@ -20,9 +20,9 @@ endfunction()
 
 # Bundle the dashboard code for inclusion during install.
 #
-# OpenWrt builds should not fail just because the remote v3 dashboard bundle is
-# temporarily unavailable. If the fetch fails, the package install step adds a
-# root index that opens the dashboard files shipped in the Netdata source tree.
+# OpenWrt passes a verified pre-downloaded v3 dashboard tarball. If a custom
+# build omits it and the remote fetch fails, the package install step still
+# adds a root index that opens the dashboard files shipped in the source tree.
 function(bundle_dashboard)
   include(ExternalProject)
 

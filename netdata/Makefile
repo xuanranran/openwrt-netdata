@@ -21,6 +21,10 @@ PKG_SOURCE_URL:=https://github.com/netdata/netdata/releases/download/v$(PKG_VERS
 PKG_HASH:=f70d8f0e73e02378e8e72a5e90c69bf773c1f54f539bf3e1cc9936a58344c4d2
 PKG_BUILD_DIR=$(BUILD_DIR)/$(PKG_NAME)-v$(PKG_VERSION)
 
+DASHBOARD_SOURCE:=$(PKG_NAME)-dashboard-v$(PKG_VERSION).tar.gz
+DASHBOARD_SOURCE_URL:=https://app.netdata.cloud
+DASHBOARD_HASH:=0a175680392e20c2bb9737c31f4610d4169a144ef93cd60b0626e3d9a23ecda7
+
 PKG_INSTALL:=1
 PKG_BUILD_PARALLEL:=1
 PKG_BUILD_FLAGS:=no-mips16 gc-sections
@@ -30,6 +34,14 @@ PKG_BUILD_DEPENDS:=protobuf/host
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/cmake.mk
 include $(INCLUDE_DIR)/nls.mk
+
+define Download/netdata-dashboard
+  FILE:=$(DASHBOARD_SOURCE)
+  URL:=$(DASHBOARD_SOURCE_URL)
+  URL_FILE:=agent.tar.gz
+  HASH:=$(DASHBOARD_HASH)
+endef
+$(eval $(call Download,netdata-dashboard))
 
 define Package/netdata
   SECTION:=admin
@@ -53,6 +65,7 @@ TARGET_LDFLAGS += -L$(STAGING_DIR)/usr/lib
 CMAKE_OPTIONS += \
 	-DCMAKE_INSTALL_PREFIX="/" \
 	-DCMAKE_CROSSCOMPILING=True \
+	-DDASHBOARD_TARBALL=$(DL_DIR)/$(DASHBOARD_SOURCE) \
 	-DProtobuf_PROTOC_EXECUTABLE=$(STAGING_DIR_HOSTPKG)/bin/protoc \
 	-DENABLE_ACLK=On \
 	-DENABLE_CLOUD=On \
