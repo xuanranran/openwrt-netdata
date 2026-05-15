@@ -22,10 +22,10 @@ return view.extend({
 				}, _('Open V3 Dashboard')),
 				E('a', {
 					'class': 'btn cbi-button',
-					'href': origin + '/v1/',
+					'href': origin + '/',
 					'target': '_blank',
 					'rel': 'noopener noreferrer'
-				}, _('Open V1 Dashboard'))
+				}, _('Open Dashboard'))
 			]),
 			E('iframe', {
 				'src': origin + '/v3/',
