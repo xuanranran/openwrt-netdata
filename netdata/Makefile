@@ -110,10 +110,6 @@ CMAKE_OPTIONS += \
 	-DENABLE_SYSTEMD_DBUS=Off \
 	-DENABLE_WEBRTC=Off
 
-define Package/netdata/conffiles
-/etc/netdata/
-endef
-
 define Package/netdata/install
 	#netdata binary
 	$(INSTALL_DIR) $(1)/usr/sbin
@@ -122,6 +118,7 @@ define Package/netdata/install
 	#netdata libs
 	$(INSTALL_DIR) $(1)/usr/lib/netdata
 	$(CP) $(PKG_INSTALL_DIR)/usr/lib/netdata/conf.d $(1)/usr/lib/netdata
+	$(INSTALL_DATA) ./files/netdata.conf $(1)/usr/lib/netdata/conf.d/netdata.conf.openwrt
 
 	#netdata plugins
 	$(INSTALL_DIR) $(1)/usr/libexec/netdata
@@ -131,16 +128,34 @@ define Package/netdata/install
 
 	#netdata configuration
 	$(INSTALL_DIR) $(1)/etc/netdata
-	$(CP) $(PKG_INSTALL_DIR)/etc/netdata $(1)/etc
-	$(INSTALL_DATA) ./files/netdata.conf $(1)/etc/netdata
-	touch $(1)/etc/netdata/.opt-out-from-anonymous-statistics
-	touch $(1)/etc/netdata/claim.conf
-	chmod 640 $(1)/etc/netdata/claim.conf
 	
 	#netdata init
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/netdata.init $(1)/etc/init.d/netdata
 
+	#sysupgrade keep list
+	$(INSTALL_DIR) $(1)/lib/upgrade/keep.d
+	$(INSTALL_DATA) ./files/netdata.sysupgrade $(1)/lib/upgrade/keep.d/netdata
+
+endef
+
+define Package/netdata/postinst
+#!/bin/sh
+root="$${IPKG_INSTROOT}"
+mkdir -p "$${root}/etc/netdata" "$${root}/var/lib/netdata/cloud.d"
+
+if [ ! -e "$${root}/etc/netdata/netdata.conf" ]; then
+	cp "$${root}/usr/lib/netdata/conf.d/netdata.conf.openwrt" "$${root}/etc/netdata/netdata.conf"
+fi
+
+if [ ! -e "$${root}/etc/netdata/claim.conf" ]; then
+	: > "$${root}/etc/netdata/claim.conf"
+fi
+
+touch "$${root}/etc/netdata/.opt-out-from-anonymous-statistics"
+chmod 640 "$${root}/etc/netdata/claim.conf" 2>/dev/null || true
+rm -f "$${root}"/etc/netdata/*.apk-new 2>/dev/null || true
+exit 0
 endef
 
 define Package/netdata-dashboard-v3/install
