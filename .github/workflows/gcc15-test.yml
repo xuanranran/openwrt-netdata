@@ -94,6 +94,14 @@ jobs:
         working-directory: openwrt
         run: make package/feeds/action/netdata/download package/feeds/action/luci-app-netdata/download -j"$(nproc)" V=s
 
+      - name: Build host tools
+        working-directory: openwrt
+        run: make tools/install -j"$(nproc)" V=sc
+
+      - name: Build GCC15 toolchain
+        working-directory: openwrt
+        run: make toolchain/install -j"$(nproc)" V=sc
+
       - name: Build netdata with GCC15
         working-directory: openwrt
         run: make package/feeds/action/netdata/compile package/feeds/action/luci-app-netdata/compile -j"$(nproc)" V=sc
