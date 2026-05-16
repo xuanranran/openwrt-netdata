@@ -7,13 +7,11 @@ on:
       - master
     paths:
       - 'netdata/**'
-      - 'netdata-dashboard-v3/**'
       - 'luci-app-netdata/**'
       - '.github/workflows/build.yml'
   pull_request:
     paths:
       - 'netdata/**'
-      - 'netdata-dashboard-v3/**'
       - 'luci-app-netdata/**'
       - '.github/workflows/build.yml'
   workflow_dispatch:

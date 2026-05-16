@@ -21,6 +21,10 @@ PKG_SOURCE_URL:=https://github.com/netdata/netdata/releases/download/v$(PKG_VERS
 PKG_HASH:=d7f178b89dc327f4f761aeaf5bd6e76a13ba220497c64c30f587f98ddc65b42b
 PKG_BUILD_DIR=$(BUILD_DIR)/$(PKG_NAME)-v$(PKG_VERSION)
 
+DASHBOARD_SOURCE:=$(PKG_NAME)-dashboard-v$(PKG_VERSION).tar.gz
+DASHBOARD_SOURCE_URL:=https://app.netdata.cloud
+DASHBOARD_HASH:=0a175680392e20c2bb9737c31f4610d4169a144ef93cd60b0626e3d9a23ecda7
+
 PKG_INSTALL:=1
 PKG_BUILD_PARALLEL:=1
 PKG_BUILD_FLAGS:=no-mips16 gc-sections
@@ -30,6 +34,14 @@ PKG_BUILD_DEPENDS:=protobuf/host
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/cmake.mk
 include $(INCLUDE_DIR)/nls.mk
+
+define Download/netdata-dashboard
+	FILE:=$(DASHBOARD_SOURCE)
+	URL:=$(DASHBOARD_SOURCE_URL)
+	URL_FILE:=agent.tar.gz
+	HASH:=$(DASHBOARD_HASH)
+endef
+$(eval $(call Download,netdata-dashboard))
 
 define Package/netdata
   SECTION:=admin
@@ -45,6 +57,18 @@ define Package/netdata/description
 
   If you want to use Python plugins install python3, python3-yaml and
   python3-urllib3
+endef
+
+define Package/netdata-dashboard-v3
+  SECTION:=admin
+  CATEGORY:=Administration
+  DEPENDS:=+netdata
+  TITLE:=Local Netdata v3 dashboard
+  URL:=https://www.netdata.cloud/
+endef
+
+define Package/netdata-dashboard-v3/description
+  Local v3 dashboard assets for the Netdata web UI.
 endef
 
 TARGET_CFLAGS := $(filter-out -O%,$(TARGET_CFLAGS)) -O3
@@ -119,4 +143,15 @@ define Package/netdata/install
 
 endef
 
+define Package/netdata-dashboard-v3/install
+	$(INSTALL_DIR) $(1)/usr/share/netdata/web
+	$(TAR) -xzf $(DL_DIR)/$(DASHBOARD_SOURCE) \
+		-C $(1)/usr/share/netdata/web \
+		--strip-components=2 \
+		dist/agent
+	find $(1)/usr/share/netdata/web/v3 -name '*.map' -delete
+	$(INSTALL_DATA) ./files/web-index.html $(1)/usr/share/netdata/web/index.html
+endef
+
 $(eval $(call BuildPackage,netdata))
+$(eval $(call BuildPackage,netdata-dashboard-v3))
