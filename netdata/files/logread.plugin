@@ -99,12 +99,17 @@ send_logs() {
 	printf '"data":['
 
 	awk -v now="$(date +%s)" -v query="$query" -v count_file="$count_tmp" '
-	function esc(s) {
-		gsub(/\\/,"\\\\",s);
-		gsub(/"/,"\\\"",s);
-		gsub(/\r/,"\\r",s);
-		gsub(/\t/,"\\t",s);
-		return s;
+	function esc(s, out, i, c) {
+		out = "";
+		for (i = 1; i <= length(s); i++) {
+			c = substr(s, i, 1);
+			if (c == "\\") out = out "\\\\";
+			else if (c == "\"") out = out "\\\"";
+			else if (c == "\r") out = out "\\r";
+			else if (c == "\t") out = out "\\t";
+			else out = out c;
+		}
+		return out;
 	}
 	function priority(line) {
 		if (line ~ /\.(emerg|alert|crit|err|error)[ :]/) return "error";
