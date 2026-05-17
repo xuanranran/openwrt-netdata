@@ -92,7 +92,7 @@ append_file_source() {
 
 columns_json() {
 	cat <<'EOF'
-"columns":{"timestamp":{"index":0,"name":"Time","type":"timestamp","transform":"datetime_usec","sort":"descending|fixed","sticky":true,"visible":true},"PRIORITY":{"index":1,"name":"Priority","type":"string","filter":"facet","visible":true,"sticky":true},"FACILITY":{"index":2,"name":"Facility","type":"string","filter":"facet","visible":true},"SYSLOG_IDENTIFIER":{"index":3,"name":"Source","type":"string","filter":"facet","visible":true},"PID":{"index":4,"name":"PID","type":"string","filter":"facet","visible":true},"CATEGORY":{"index":5,"name":"Category","type":"string","filter":"facet","visible":true},"MESSAGE":{"index":6,"name":"Message","type":"string","full_width":true,"options":["full_width","wrap","visible","main_text","fts"]}}
+"columns":{"timestamp":{"index":0,"name":"Time","type":"string","sort":"descending|fixed","sticky":true,"visible":true},"PRIORITY":{"index":1,"name":"Priority","type":"string","filter":"facet","visible":true,"sticky":true},"FACILITY":{"index":2,"name":"Facility","type":"string","filter":"facet","visible":true},"SYSLOG_IDENTIFIER":{"index":3,"name":"Source","type":"string","filter":"facet","visible":true},"PID":{"index":4,"name":"PID","type":"string","filter":"facet","visible":true},"CATEGORY":{"index":5,"name":"Category","type":"string","filter":"facet","visible":true},"MESSAGE":{"index":6,"name":"Message","type":"string","full_width":true,"options":["full_width","wrap","visible","main_text","fts"]}}
 EOF
 }
 
@@ -141,7 +141,6 @@ send_info() {
 	printf '"pagination":{"enabled":true,"key":"anchor","column":"timestamp","units":"timestamp_usec"},'
 	columns_json
 	printf ','
-	printf '"available_histograms":[{"id":"PRIORITY","name":"Priority","order":1},{"id":"SYSLOG_IDENTIFIER","name":"Source","order":2},{"id":"CATEGORY","name":"Category","order":3}],'
 	printf '"data":[]'
 	printf '}'
 	result_end
@@ -165,7 +164,6 @@ send_logs() {
 	tmp="/tmp/netdata-logread.$$"
 	count_tmp="/tmp/netdata-logread-count.$$"
 	facet_tmp="/tmp/netdata-logread-facets.$$"
-	histogram_tmp="/tmp/netdata-logread-histogram.$$"
 	: >"$tmp"
 
 	if source_selected "$payload" openwrt-logread; then
@@ -202,10 +200,9 @@ send_logs() {
 	printf '"table":{"id":"openwrt-logread","has_history":true},'
 	columns_json
 	printf ','
-	printf '"available_histograms":[{"id":"PRIORITY","name":"Priority","order":1},{"id":"SYSLOG_IDENTIFIER","name":"Source","order":2},{"id":"CATEGORY","name":"Category","order":3}],'
 	printf '"data":['
 
-	awk -v now_text="$(date '+%Y-%m-%d %H:%M:%S')" -v now_epoch="$(date +%s)" -v query="$query" -v max="$last" -v count_file="$count_tmp" -v facet_file="$facet_tmp" -v histogram_file="$histogram_tmp" '
+	awk -v now_text="$(date '+%Y-%m-%d %H:%M:%S')" -v query="$query" -v max="$last" -v count_file="$count_tmp" -v facet_file="$facet_tmp" '
 	function esc(s, out, i, c) {
 		out = "";
 		for (i = 1; i <= length(s); i++) {
@@ -249,18 +246,6 @@ send_logs() {
 			}
 		}
 		return now_text;
-	}
-	function date_epoch(text, cmd, value) {
-		if (text in epoch_cache) return epoch_cache[text];
-		cmd = "date -d \"" text "\" +%s 2>/dev/null";
-		cmd | getline value;
-		close(cmd);
-		if (value ~ /^[0-9][0-9]*$/) {
-			epoch_cache[text] = value + 0;
-			return epoch_cache[text];
-		}
-		epoch_cache[text] = now_epoch + 0;
-		return epoch_cache[text];
 	}
 	function priority(line) {
 		if (line ~ /\.(emerg|alert|crit|err|error)[ :]/) return "error";
@@ -356,25 +341,18 @@ send_logs() {
 		for (i = n; i >= 1 && returned < max; i--) {
 			sep = (returned == 0) ? "" : ",";
 			ts = log_time(rows[i]);
-			epoch = date_epoch(ts);
-			ts_usec = sprintf("%.0f", (epoch * 1000000) + (n - i));
 			p = row_priority[i] != "" ? row_priority[i] : priority(rows[i]);
 			f = row_source[i] != "" ? "file" : facility(rows[i]);
 			s = row_source[i] != "" ? row_source[i] : source(rows[i]);
 			process_id = row_source[i] != "" ? "-" : pid(rows[i]);
 			msg = row_source[i] != "" ? rows[i] : message(rows[i]);
 			c = category(s, msg);
-			printf "%s[%s,\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",{\"rowOptions\":{\"severity\":\"%s\"}}]", sep, ts_usec, p, esc(f), esc(s), esc(process_id), esc(c), esc(msg), p;
+			printf "%s[\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",{\"rowOptions\":{\"severity\":\"%s\"}}]", sep, esc(ts), p, esc(f), esc(s), esc(process_id), esc(c), esc(msg), p;
 			priority_count[p]++;
 			facility_count[f]++;
 			source_count[s]++;
 			pid_count[process_id]++;
 			category_count[c]++;
-			bucket = int(epoch / 60) * 60;
-			bucket_seen[bucket] = 1;
-			histogram_count[bucket, p]++;
-			if (min_bucket == "" || bucket < min_bucket) min_bucket = bucket;
-			if (max_bucket == "" || bucket > max_bucket) max_bucket = bucket;
 			returned++;
 		}
 		print total + 0 > count_file;
@@ -426,23 +404,11 @@ send_logs() {
 		}
 		printf "]}]" >> facet_file;
 
-		printf "{\"id\":\"PRIORITY\",\"name\":\"Priority\",\"chart\":{\"result\":{\"labels\":[\"time\",\"error\",\"warning\",\"notice\",\"info\",\"debug\"],\"data\":[" > histogram_file;
-		sep = "";
-		if (min_bucket != "") {
-			for (bucket = min_bucket; bucket <= max_bucket; bucket += 60) {
-				if (bucket_seen[bucket]) {
-					printf "%s[%d,%d,%d,%d,%d,%d]", sep, bucket, histogram_count[bucket, "error"] + 0, histogram_count[bucket, "warning"] + 0, histogram_count[bucket, "notice"] + 0, histogram_count[bucket, "info"] + 0, histogram_count[bucket, "debug"] + 0 >> histogram_file;
-					sep = ",";
-				}
-			}
-		}
-		printf "]}}}" >> histogram_file;
 	}' "$tmp"
 
 	evaluated="$(sed -n '1p' "$count_tmp" 2>/dev/null)"
 	returned="$(sed -n '2p' "$count_tmp" 2>/dev/null)"
 	facets="$(cat "$facet_tmp" 2>/dev/null)"
-	histogram="$(cat "$histogram_tmp" 2>/dev/null)"
 	case "$evaluated" in
 		''|*[!0-9]*) evaluated=0 ;;
 	esac
@@ -453,11 +419,8 @@ send_logs() {
 	rm -f "$tmp"
 	rm -f "$count_tmp"
 	rm -f "$facet_tmp"
-	rm -f "$histogram_tmp"
 	printf '],'
 	printf '"facets":%s,' "$facets"
-	[ -n "$histogram" ] || histogram='{"id":"PRIORITY","name":"Priority","chart":{"result":{"labels":["time","error","warning","notice","info","debug"],"data":[]}}}'
-	printf '"histogram":%s,' "$histogram"
 	printf '"items":{"evaluated":%s,"matched":%s,"returned":%s,"max_to_return":%s},' "$evaluated" "$returned" "$returned" "$last"
 	printf '"anchor":{"last_modified":%s,"direction":"backward"},' "$(date +%s)000000"
 	printf '"default_sort_column":"timestamp","default_charts":[]'
