@@ -92,7 +92,7 @@ append_file_source() {
 
 columns_json() {
 	cat <<'EOF'
-"columns":{"timestamp":{"index":0,"name":"Time","type":"timestamp","transform":"datetime_usec","sort":"descending|fixed","sticky":true,"visible":true},"rowOptions":{"index":1,"name":"rowOptions","type":"none","dummy":true},"PRIORITY":{"index":2,"name":"Priority","type":"string","filter":"facet","visible":true,"sticky":true},"FACILITY":{"index":3,"name":"Facility","type":"string","filter":"facet","visible":true},"SYSLOG_IDENTIFIER":{"index":4,"name":"Source","type":"string","filter":"facet","visible":true},"PID":{"index":5,"name":"PID","type":"string","filter":"facet","visible":true},"CATEGORY":{"index":6,"name":"Category","type":"string","filter":"facet","visible":true},"MESSAGE":{"index":7,"name":"Message","type":"string","full_width":true,"options":["full_width","wrap","visible","main_text","fts"]}}
+"columns":{"timestamp":{"index":0,"name":"Time","type":"timestamp","transform":"datetime_usec","sort":"descending|fixed","sticky":true,"visible":true},"PRIORITY":{"index":1,"name":"Priority","type":"string","filter":"facet","visible":true,"sticky":true},"FACILITY":{"index":2,"name":"Facility","type":"string","filter":"facet","visible":true},"SYSLOG_IDENTIFIER":{"index":3,"name":"Source","type":"string","filter":"facet","visible":true},"PID":{"index":4,"name":"PID","type":"string","filter":"facet","visible":true},"CATEGORY":{"index":5,"name":"Category","type":"string","filter":"facet","visible":true},"MESSAGE":{"index":6,"name":"Message","type":"string","full_width":true,"options":["full_width","wrap","visible","main_text","fts"]}}
 EOF
 }
 
@@ -364,7 +364,7 @@ send_logs() {
 			process_id = row_source[i] != "" ? "-" : pid(rows[i]);
 			msg = row_source[i] != "" ? rows[i] : message(rows[i]);
 			c = category(s, msg);
-			printf "%s[%s,{\"rowOptions\":{\"severity\":\"%s\"}},\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"]", sep, ts_usec, p, p, esc(f), esc(s), esc(process_id), esc(c), esc(msg);
+			printf "%s[%s,\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",{\"rowOptions\":{\"severity\":\"%s\"}}]", sep, ts_usec, p, esc(f), esc(s), esc(process_id), esc(c), esc(msg), p;
 			priority_count[p]++;
 			facility_count[f]++;
 			source_count[s]++;
