@@ -76,6 +76,7 @@ jobs:
             "libyaml*" \
             "libopenssl*" \
             "libcurl*" \
+            "libunwind*" \
             "libzstd*"; do
             find bin/packages/ -type f \( -name "${pattern}.ipk" -o -name "${pattern}.apk" \) -exec cp -n {} bin/artifacts/ \; 2>/dev/null || true
           done
