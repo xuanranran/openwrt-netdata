@@ -29,11 +29,17 @@ PKG_INSTALL:=1
 PKG_BUILD_PARALLEL:=1
 PKG_BUILD_FLAGS:=no-mips16 gc-sections
 
-PKG_BUILD_DEPENDS:=protobuf/host
+PKG_BUILD_DEPENDS:=protobuf/host rust/host
 
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/cmake.mk
 include $(INCLUDE_DIR)/nls.mk
+
+ifeq ($(ARCH),x86_64)
+RUST_CARGO_TARGET:=x86_64-unknown-linux-musl
+else ifeq ($(ARCH),aarch64)
+RUST_CARGO_TARGET:=aarch64-unknown-linux-musl
+endif
 
 define Download/netdata-dashboard
 	FILE:=$(DASHBOARD_SOURCE)
@@ -87,6 +93,7 @@ CMAKE_OPTIONS += \
 	-DENABLE_LIBUNWIND=Off \
 	-DENABLE_LOGS_MANAGEMENT_TESTS=Off \
 	-DENABLE_ML=Off \
+	-DENABLE_NETDATA_JOURNAL_FILE_READER=On \
 	-DENABLE_PLUGIN_APPS=Off \
 	-DENABLE_PLUGIN_IBM=Off \
 	-DENABLE_PLUGIN_CGROUP_NETWORK=Off \
@@ -96,7 +103,7 @@ CMAKE_OPTIONS += \
 	-DENABLE_PLUGIN_FREEIPMI=Off \
 	-DENABLE_PLUGIN_GO=Off \
 	-DENABLE_PLUGIN_LOCAL_LISTENERS=Off \
-	-DENABLE_PLUGIN_LOGS_MANAGEMENT=Off \
+	-DENABLE_PLUGIN_LOGS_MANAGEMENT=On \
 	-DENABLE_PLUGIN_NETWORK_VIEWER=Off \
 	-DENABLE_PLUGIN_NFACCT=Off \
 	-DENABLE_PLUGIN_OTEL=Off \
@@ -104,16 +111,24 @@ CMAKE_OPTIONS += \
 	-DENABLE_PLUGIN_PERF=Off \
 	-DENABLE_PLUGIN_SCRIPTS=Off \
 	-DENABLE_PLUGIN_SLABINFO=Off \
-	-DENABLE_PLUGIN_SYSTEMD_JOURNAL=Off \
+	-DENABLE_PLUGIN_SYSTEMD_JOURNAL=On \
 	-DENABLE_PLUGIN_SYSTEMD_UNITS=Off \
 	-DENABLE_PLUGIN_XENSTAT=Off \
 	-DENABLE_SYSTEMD_DBUS=Off \
 	-DENABLE_WEBRTC=Off
 
+ifneq ($(RUST_CARGO_TARGET),)
+CMAKE_OPTIONS += -DRust_CARGO_TARGET=$(RUST_CARGO_TARGET)
+endif
+
 define Package/netdata/install
 	#netdata binary
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/sbin/netdata $(1)/usr/sbin
+	if [ -f $(PKG_INSTALL_DIR)/usr/bin/log2journal ]; then \
+		$(INSTALL_DIR) $(1)/usr/bin; \
+		$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/log2journal $(1)/usr/bin/; \
+	fi
 
 	#netdata libs
 	$(INSTALL_DIR) $(1)/usr/lib/netdata
