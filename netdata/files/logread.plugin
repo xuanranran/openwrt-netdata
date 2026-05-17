@@ -156,7 +156,7 @@ send_logs() {
 	result_end
 }
 
-printf 'FUNCTION GLOBAL "logread" 10 "OpenWrt logd logs" "logs" 0x13 100 1\n'
+printf 'FUNCTION GLOBAL "logread" 10 "OpenWrt logd logs" "logs" 0x8 100 1\n'
 printf 'FLUSH\n'
 
 while IFS= read -r line; do
