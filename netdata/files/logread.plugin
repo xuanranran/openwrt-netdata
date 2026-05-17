@@ -92,7 +92,7 @@ append_file_source() {
 
 columns_json() {
 	cat <<'EOF'
-"columns":{"timestamp":{"index":0,"name":"Timestamp","type":"timestamp","transform":"datetime_usec","sort":"descending|fixed","sticky":true,"visible":true},"rowOptions":{"index":1,"name":"rowOptions","type":"none","dummy":true},"PRIORITY":{"index":2,"name":"Priority","type":"string","filter":"facet","visible":true,"sticky":true},"SYSLOG_IDENTIFIER":{"index":3,"name":"Source","type":"string","filter":"facet","visible":true},"MESSAGE":{"index":4,"name":"Message","type":"string","full_width":true,"options":["full_width","wrap","visible","main_text","fts"]}}
+"columns":{"timestamp":{"index":0,"name":"Time","type":"string","sort":"descending|fixed","sticky":true,"visible":true},"rowOptions":{"index":1,"name":"rowOptions","type":"none","dummy":true},"PRIORITY":{"index":2,"name":"Priority","type":"string","filter":"facet","visible":true,"sticky":true},"SYSLOG_IDENTIFIER":{"index":3,"name":"Source","type":"string","filter":"facet","visible":true},"MESSAGE":{"index":4,"name":"Message","type":"string","full_width":true,"options":["full_width","wrap","visible","main_text","fts"]}}
 EOF
 }
 
@@ -202,7 +202,7 @@ send_logs() {
 	printf ','
 	printf '"data":['
 
-	awk -v now="$(date +%s)" -v query="$query" -v max="$last" -v count_file="$count_tmp" -v facet_file="$facet_tmp" '
+	awk -v now_text="$(date '+%Y-%m-%d %H:%M:%S')" -v query="$query" -v max="$last" -v count_file="$count_tmp" -v facet_file="$facet_tmp" '
 	function esc(s, out, i, c) {
 		out = "";
 		for (i = 1; i <= length(s); i++) {
@@ -225,6 +225,27 @@ send_logs() {
 		if (p == "info") return 4;
 		if (p == "debug") return 5;
 		return 99;
+	}
+	function month_number(mon) {
+		return int((index("JanFebMarAprMayJunJulAugSepOctNovDec", mon) + 2) / 3);
+	}
+	function two_digits(value) {
+		return sprintf("%02d", value + 0);
+	}
+	function log_time(line, parts, mon, date_part) {
+		if (match(line, /[0-9][0-9][0-9][0-9][-\/][0-9][0-9][-\/][0-9][0-9][T ][0-9][0-9]:[0-9][0-9]:[0-9][0-9]/)) {
+			date_part = substr(line, RSTART, 10);
+			gsub(/\//, "-", date_part);
+			return date_part " " substr(line, RSTART + 11, 8);
+		}
+		split(line, parts, " ");
+		if (parts[2] ~ /^[A-Z][a-z][a-z]$/ && parts[3] ~ /^[0-9][0-9]?$/ && parts[4] ~ /^[0-9][0-9]:[0-9][0-9]:[0-9][0-9]$/ && parts[5] ~ /^[0-9][0-9][0-9][0-9]$/) {
+			mon = month_number(parts[2]);
+			if (mon >= 1 && mon <= 12) {
+				return parts[5] "-" two_digits(mon) "-" two_digits(parts[3]) " " parts[4];
+			}
+		}
+		return now_text;
 	}
 	function priority(line) {
 		if (line ~ /\.(emerg|alert|crit|err|error)[ :]/) return "error";
@@ -268,11 +289,10 @@ send_logs() {
 	END {
 		for (i = n; i >= 1 && returned < max; i--) {
 			sep = (returned == 0) ? "" : ",";
-			ts = (now * 1000000) + (n - i);
-			ts = sprintf("%.0f", ts);
+			ts = log_time(rows[i]);
 			p = row_priority[i] != "" ? row_priority[i] : priority(rows[i]);
 			s = row_source[i] != "" ? row_source[i] : source(rows[i]);
-			printf "%s[%s,{\"rowOptions\":{\"severity\":\"%s\"}},\"%s\",\"%s\",\"%s\"]", sep, ts, p, p, esc(s), esc(rows[i]);
+			printf "%s[\"%s\",{\"rowOptions\":{\"severity\":\"%s\"}},\"%s\",\"%s\",\"%s\"]", sep, esc(ts), p, p, esc(s), esc(rows[i]);
 			priority_count[p]++;
 			source_count[s]++;
 			returned++;
