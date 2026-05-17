@@ -81,6 +81,7 @@ send_logs() {
 	[ -n "$query" ] || query="$(json_string_param "$payload" query)"
 	tmp="/tmp/netdata-logread.$$"
 	count_tmp="/tmp/netdata-logread-count.$$"
+	facet_tmp="/tmp/netdata-logread-facets.$$"
 	if ! logread -l "$last" >"$tmp" 2>/dev/null; then
 		logread 2>/dev/null | tail -n "$last" >"$tmp"
 	fi
@@ -98,7 +99,7 @@ send_logs() {
 	printf ','
 	printf '"data":['
 
-	awk -v now="$(date +%s)" -v query="$query" -v count_file="$count_tmp" '
+	awk -v now="$(date +%s)" -v query="$query" -v count_file="$count_tmp" -v facet_file="$facet_tmp" '
 	function esc(s, out, i, c) {
 		out = "";
 		for (i = 1; i <= length(s); i++) {
@@ -111,6 +112,17 @@ send_logs() {
 		}
 		return out;
 	}
+	function json_kv(id, name, count, order) {
+		return "{\"id\":\"" esc(id) "\",\"name\":\"" esc(name) "\",\"count\":" count ",\"order\":" order "}";
+	}
+	function priority_order(p) {
+		if (p == "error") return 1;
+		if (p == "warning") return 2;
+		if (p == "notice") return 3;
+		if (p == "info") return 4;
+		if (p == "debug") return 5;
+		return 99;
+	}
 	function priority(line) {
 		if (line ~ /\.(emerg|alert|crit|err|error)[ :]/) return "error";
 		if (line ~ /\.(warn|warning)[ :]/) return "warning";
@@ -118,13 +130,20 @@ send_logs() {
 		if (line ~ /\.debug[ :]/) return "debug";
 		return "info";
 	}
-	function source(line, a) {
-		if (match(line, /[A-Za-z0-9_.-]+\.[A-Za-z0-9_.-]+/)) {
-			return substr(line, RSTART, RLENGTH);
+	function source(line, rest, token) {
+		if (match(line, /[A-Za-z0-9_.-]+\.[A-Za-z0-9_.-]+:?/)) {
+			rest = substr(line, RSTART + RLENGTH);
+			sub(/^[[:space:]:]+/, "", rest);
+			token = rest;
+			sub(/[[:space:]].*/, "", token);
+			sub(/:.*/, "", token);
+			sub(/\[.*/, "", token);
+			if (token != "") return token;
 		}
 		return "logread";
 	}
 	{
+		total++;
 		if (query != "" && index(tolower($0), tolower(query)) == 0) next;
 		rows[++n] = $0;
 	}
@@ -136,20 +155,55 @@ send_logs() {
 			p = priority(rows[i]);
 			s = source(rows[i]);
 			printf "%s[%s,{\"rowOptions\":{\"severity\":\"%s\"}},\"%s\",\"%s\",\"%s\"]", sep, ts, p, p, esc(s), esc(rows[i]);
+			priority_count[p]++;
+			source_count[s]++;
 			returned++;
 		}
-		print returned + 0 > count_file;
+		print total + 0 > count_file;
+		print returned + 0 >> count_file;
+
+		printf "[{\"id\":\"PRIORITY\",\"name\":\"Priority\",\"order\":1,\"options\":[" > facet_file;
+		sep = "";
+		split("error warning notice info debug", priorities, " ");
+		for (i = 1; i <= 5; i++) {
+			p = priorities[i];
+			if (priority_count[p] > 0) {
+				printf "%s%s", sep, json_kv(p, p, priority_count[p], priority_order(p)) >> facet_file;
+				sep = ",";
+			}
+		}
+		for (p in priority_count) {
+			if (p != "error" && p != "warning" && p != "notice" && p != "info" && p != "debug") {
+				printf "%s%s", sep, json_kv(p, p, priority_count[p], priority_order(p)) >> facet_file;
+				sep = ",";
+			}
+		}
+		printf "]},{\"id\":\"SYSLOG_IDENTIFIER\",\"name\":\"Source\",\"order\":2,\"options\":[" >> facet_file;
+		sep = "";
+		order = 1;
+		for (s in source_count) {
+			printf "%s%s", sep, json_kv(s, s, source_count[s], order++) >> facet_file;
+			sep = ",";
+		}
+		printf "]}]" >> facet_file;
 	}' "$tmp"
 
-	returned="$(cat "$count_tmp" 2>/dev/null)"
+	evaluated="$(sed -n '1p' "$count_tmp" 2>/dev/null)"
+	returned="$(sed -n '2p' "$count_tmp" 2>/dev/null)"
+	facets="$(cat "$facet_tmp" 2>/dev/null)"
+	case "$evaluated" in
+		''|*[!0-9]*) evaluated=0 ;;
+	esac
 	case "$returned" in
 		''|*[!0-9]*) returned=0 ;;
 	esac
+	[ -n "$facets" ] || facets='[]'
 	rm -f "$tmp"
 	rm -f "$count_tmp"
+	rm -f "$facet_tmp"
 	printf '],'
-	printf '"facets":[],'
-	printf '"items":{"evaluated":%s,"matched":%s,"returned":%s,"max_to_return":%s},' "$last" "$returned" "$returned" "$last"
+	printf '"facets":%s,' "$facets"
+	printf '"items":{"evaluated":%s,"matched":%s,"returned":%s,"max_to_return":%s},' "$evaluated" "$returned" "$returned" "$last"
 	printf '"anchor":{"last_modified":%s,"direction":"backward"},' "$(date +%s)000000"
 	printf '"default_sort_column":"timestamp","default_charts":[]'
 	printf '}'
