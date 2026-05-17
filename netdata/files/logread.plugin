@@ -26,6 +26,70 @@ json_string_param() {
 	printf '%s\n' "$1" | sed -n "s/.*\"$2\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p"
 }
 
+print_source_option() {
+	id="$1"
+	name="$2"
+	pill="$3"
+	info="$4"
+	default_selected="$5"
+
+	[ "$SOURCE_OPTION_SEP" = "1" ] && printf ','
+	SOURCE_OPTION_SEP=1
+	printf '{"id":"%s","name":"%s","pill":"%s","info":"%s"' "$id" "$name" "$pill" "$info"
+	[ "$default_selected" = "1" ] && printf ',"defaultSelected":true'
+	printf '}'
+}
+
+source_file_path() {
+	case "$1" in
+		openclash) [ -s /tmp/openclash.log ] && printf '%s\n' /tmp/openclash.log ;;
+		openclash-start) [ -s /tmp/openclash_start.log ] && printf '%s\n' /tmp/openclash_start.log ;;
+		passwall) [ -s /tmp/log/passwall.log ] && printf '%s\n' /tmp/log/passwall.log || { [ -s /var/log/passwall.log ] && printf '%s\n' /var/log/passwall.log; } ;;
+		ssrplus) [ -s /tmp/log/ssrplus.log ] && printf '%s\n' /tmp/log/ssrplus.log || { [ -s /var/log/ssrplus.log ] && printf '%s\n' /var/log/ssrplus.log; } ;;
+		nikki-core) [ -s /tmp/log/nikki/core.log ] && printf '%s\n' /tmp/log/nikki/core.log || { [ -s /var/log/nikki/core.log ] && printf '%s\n' /var/log/nikki/core.log; } ;;
+		nikki-app) [ -s /tmp/log/nikki/app.log ] && printf '%s\n' /tmp/log/nikki/app.log || { [ -s /var/log/nikki/app.log ] && printf '%s\n' /var/log/nikki/app.log; } ;;
+		momo-core) [ -s /tmp/log/momo/core.log ] && printf '%s\n' /tmp/log/momo/core.log || { [ -s /var/log/momo/core.log ] && printf '%s\n' /var/log/momo/core.log; } ;;
+		momo-app) [ -s /tmp/log/momo/app.log ] && printf '%s\n' /tmp/log/momo/app.log || { [ -s /var/log/momo/app.log ] && printf '%s\n' /var/log/momo/app.log; } ;;
+		netdata-health) [ -s /tmp/log/netdata/health.log ] && printf '%s\n' /tmp/log/netdata/health.log || { [ -s /var/log/netdata/health.log ] && printf '%s\n' /var/log/netdata/health.log; } ;;
+		netdata-collector) [ -s /tmp/log/netdata/collector.log ] && printf '%s\n' /tmp/log/netdata/collector.log || { [ -s /var/log/netdata/collector.log ] && printf '%s\n' /var/log/netdata/collector.log; } ;;
+		netdata-aclk) [ -s /tmp/log/netdata/aclk.log ] && printf '%s\n' /tmp/log/netdata/aclk.log || { [ -s /var/log/netdata/aclk.log ] && printf '%s\n' /var/log/netdata/aclk.log; } ;;
+		smbd) [ -s /tmp/log/log.smbd ] && printf '%s\n' /tmp/log/log.smbd || { [ -s /var/log/log.smbd ] && printf '%s\n' /var/log/log.smbd; } ;;
+		nmbd) [ -s /tmp/log/log.nmbd ] && printf '%s\n' /tmp/log/log.nmbd || { [ -s /var/log/log.nmbd ] && printf '%s\n' /var/log/log.nmbd; } ;;
+		appfilter) [ -s /tmp/log/appfilter.log ] && printf '%s\n' /tmp/log/appfilter.log || { [ -s /var/log/appfilter.log ] && printf '%s\n' /var/log/appfilter.log; } ;;
+		easytier) [ -s /tmp/easytier.log ] && printf '%s\n' /tmp/easytier.log ;;
+		easytierweb) [ -s /tmp/easytierweb.log ] && printf '%s\n' /tmp/easytierweb.log ;;
+		apk) [ -s /tmp/log/apk.log ] && printf '%s\n' /tmp/log/apk.log || { [ -s /var/log/apk.log ] && printf '%s\n' /var/log/apk.log; } ;;
+	esac
+}
+
+source_selected() {
+	payload="$1"
+	id="$2"
+
+	case "$payload" in
+		*'"source"'*) case "$payload" in *"\"$id\""*) return 0 ;; *) return 1 ;; esac ;;
+	esac
+
+	return 0
+}
+
+append_file_source() {
+	payload="$1"
+	id="$2"
+	name="$3"
+	level="$4"
+	out="$5"
+	limit="$6"
+	path="$(source_file_path "$id")"
+
+	[ -n "$path" ] || return
+	source_selected "$payload" "$id" || return
+
+	tail -n "$limit" "$path" 2>/dev/null | while IFS= read -r file_line; do
+		printf '__NETDATA_FILE__%s\t%s\t%s\n' "$name" "$level" "$file_line"
+	done >>"$out"
+}
+
 columns_json() {
 	cat <<'EOF'
 "columns":{"timestamp":{"index":0,"name":"Timestamp","type":"timestamp","transform":"datetime_usec","sort":"descending|fixed","sticky":true,"visible":true},"rowOptions":{"index":1,"name":"rowOptions","type":"none","dummy":true},"PRIORITY":{"index":2,"name":"Priority","type":"string","filter":"facet","visible":true,"sticky":true},"SYSLOG_IDENTIFIER":{"index":3,"name":"Source","type":"string","filter":"facet","visible":true},"MESSAGE":{"index":4,"name":"Message","type":"string","full_width":true,"options":["full_width","wrap","visible","main_text","fts"]}}
@@ -33,9 +97,27 @@ EOF
 }
 
 sources_json() {
-	cat <<'EOF'
-"required_params":[{"id":"source","name":"Sources","help":"Select the logs source to query","type":"multiselect","options":[{"id":"openwrt-logread","name":"OpenWrt logread","pill":"logd","info":"OpenWrt logd ring buffer via logread"}]}]
-EOF
+	SOURCE_OPTION_SEP=0
+	printf '"required_params":[{"id":"source","name":"Sources","help":"Select the logs source to query","type":"multiselect","options":['
+	print_source_option openwrt-logread "OpenWrt logread" logd "OpenWrt logd ring buffer via logread" 1
+	[ -n "$(source_file_path openclash)" ] && print_source_option openclash "OpenClash log" file "/tmp/openclash.log" 0
+	[ -n "$(source_file_path openclash-start)" ] && print_source_option openclash-start "OpenClash start log" file "/tmp/openclash_start.log" 0
+	[ -n "$(source_file_path passwall)" ] && print_source_option passwall "PassWall log" file "PassWall runtime log" 0
+	[ -n "$(source_file_path ssrplus)" ] && print_source_option ssrplus "SSR Plus log" file "SSR Plus runtime log" 0
+	[ -n "$(source_file_path nikki-core)" ] && print_source_option nikki-core "Nikki core log" file "Nikki core log" 0
+	[ -n "$(source_file_path nikki-app)" ] && print_source_option nikki-app "Nikki app log" file "Nikki app log" 0
+	[ -n "$(source_file_path momo-core)" ] && print_source_option momo-core "Momo core log" file "Momo core log" 0
+	[ -n "$(source_file_path momo-app)" ] && print_source_option momo-app "Momo app log" file "Momo app log" 0
+	[ -n "$(source_file_path netdata-health)" ] && print_source_option netdata-health "Netdata health log" file "Netdata health log" 0
+	[ -n "$(source_file_path netdata-collector)" ] && print_source_option netdata-collector "Netdata collector log" file "Netdata collector log" 0
+	[ -n "$(source_file_path netdata-aclk)" ] && print_source_option netdata-aclk "Netdata ACLK log" file "Netdata ACLK log" 0
+	[ -n "$(source_file_path smbd)" ] && print_source_option smbd "Samba smbd log" file "Samba smbd log" 0
+	[ -n "$(source_file_path nmbd)" ] && print_source_option nmbd "Samba nmbd log" file "Samba nmbd log" 0
+	[ -n "$(source_file_path appfilter)" ] && print_source_option appfilter "AppFilter log" file "AppFilter log" 0
+	[ -n "$(source_file_path easytier)" ] && print_source_option easytier "EasyTier log" file "EasyTier log" 0
+	[ -n "$(source_file_path easytierweb)" ] && print_source_option easytierweb "EasyTier Web log" file "EasyTier Web log" 0
+	[ -n "$(source_file_path apk)" ] && print_source_option apk "APK log" file "APK package log" 0
+	printf ']}]'
 }
 
 accepted_params_json() {
@@ -82,9 +164,30 @@ send_logs() {
 	tmp="/tmp/netdata-logread.$$"
 	count_tmp="/tmp/netdata-logread-count.$$"
 	facet_tmp="/tmp/netdata-logread-facets.$$"
-	if ! logread -l "$last" >"$tmp" 2>/dev/null; then
-		logread 2>/dev/null | tail -n "$last" >"$tmp"
+	: >"$tmp"
+
+	if source_selected "$payload" openwrt-logread; then
+		if ! logread -l "$last" >>"$tmp" 2>/dev/null; then
+			logread 2>/dev/null | tail -n "$last" >>"$tmp"
+		fi
 	fi
+	append_file_source "$payload" openclash "OpenClash" notice "$tmp" "$last"
+	append_file_source "$payload" openclash-start "OpenClash start" notice "$tmp" "$last"
+	append_file_source "$payload" passwall "PassWall" info "$tmp" "$last"
+	append_file_source "$payload" ssrplus "SSR Plus" info "$tmp" "$last"
+	append_file_source "$payload" nikki-core "Nikki core" info "$tmp" "$last"
+	append_file_source "$payload" nikki-app "Nikki app" info "$tmp" "$last"
+	append_file_source "$payload" momo-core "Momo core" info "$tmp" "$last"
+	append_file_source "$payload" momo-app "Momo app" info "$tmp" "$last"
+	append_file_source "$payload" netdata-health "Netdata health" warning "$tmp" "$last"
+	append_file_source "$payload" netdata-collector "Netdata collector" info "$tmp" "$last"
+	append_file_source "$payload" netdata-aclk "Netdata ACLK" info "$tmp" "$last"
+	append_file_source "$payload" smbd "smbd" info "$tmp" "$last"
+	append_file_source "$payload" nmbd "nmbd" info "$tmp" "$last"
+	append_file_source "$payload" appfilter "AppFilter" info "$tmp" "$last"
+	append_file_source "$payload" easytier "EasyTier" info "$tmp" "$last"
+	append_file_source "$payload" easytierweb "EasyTier Web" info "$tmp" "$last"
+	append_file_source "$payload" apk "APK" info "$tmp" "$last"
 
 	result_begin "$tx" 200
 	printf '{'
@@ -99,7 +202,7 @@ send_logs() {
 	printf ','
 	printf '"data":['
 
-	awk -v now="$(date +%s)" -v query="$query" -v count_file="$count_tmp" -v facet_file="$facet_tmp" '
+	awk -v now="$(date +%s)" -v query="$query" -v max="$last" -v count_file="$count_tmp" -v facet_file="$facet_tmp" '
 	function esc(s, out, i, c) {
 		out = "";
 		for (i = 1; i <= length(s); i++) {
@@ -143,17 +246,32 @@ send_logs() {
 		return "logread";
 	}
 	{
+		line = $0;
+		file_source = "";
+		file_priority = "";
+		if (substr(line, 1, 16) == "__NETDATA_FILE__") {
+			rest = substr(line, 17);
+			file_source = rest;
+			sub(/\t.*/, "", file_source);
+			sub(/^[^\t]*\t/, "", rest);
+			file_priority = rest;
+			sub(/\t.*/, "", file_priority);
+			sub(/^[^\t]*\t/, "", rest);
+			line = rest;
+		}
 		total++;
-		if (query != "" && index(tolower($0), tolower(query)) == 0) next;
-		rows[++n] = $0;
+		if (query != "" && index(tolower(line), tolower(query)) == 0) next;
+		rows[++n] = line;
+		row_source[n] = file_source;
+		row_priority[n] = file_priority;
 	}
 	END {
-		for (i = n; i >= 1; i--) {
-			sep = (i == n) ? "" : ",";
+		for (i = n; i >= 1 && returned < max; i--) {
+			sep = (returned == 0) ? "" : ",";
 			ts = (now * 1000000) + (n - i);
 			ts = sprintf("%.0f", ts);
-			p = priority(rows[i]);
-			s = source(rows[i]);
+			p = row_priority[i] != "" ? row_priority[i] : priority(rows[i]);
+			s = row_source[i] != "" ? row_source[i] : source(rows[i]);
 			printf "%s[%s,{\"rowOptions\":{\"severity\":\"%s\"}},\"%s\",\"%s\",\"%s\"]", sep, ts, p, p, esc(s), esc(rows[i]);
 			priority_count[p]++;
 			source_count[s]++;
