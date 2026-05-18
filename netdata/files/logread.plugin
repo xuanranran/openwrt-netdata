@@ -69,6 +69,10 @@ zerotier_available() {
 	return 1
 }
 
+kernel_dmesg_available() {
+	command -v dmesg >/dev/null 2>&1
+}
+
 source_selected() {
 	payload="$1"
 	id="$2"
@@ -120,9 +124,22 @@ append_zerotier_source() {
 		done >>"$out"
 }
 
+append_kernel_dmesg_source() {
+	payload="$1"
+	out="$2"
+	limit="$3"
+
+	source_selected "$payload" kernel-dmesg || return
+
+	dmesg -r 2>/dev/null |
+		while IFS= read -r file_line; do
+			printf '__NETDATA_FILE__%s\t%s\t%s\n' "Kernel dmesg" info "$file_line"
+		done >>"$out"
+}
+
 columns_json() {
 	cat <<'EOF'
-"columns":{"timestamp":{"index":0,"name":"Time","type":"string","sort":"descending|fixed","sticky":true,"visible":true},"rowOptions":{"index":1,"name":"rowOptions","type":"none","visualization":"rowOptions","dummy":true},"Priority":{"index":2,"name":"Priority","type":"string","filter":"facet","visible":true,"sticky":true},"Source":{"index":3,"name":"Source","type":"string","filter":"facet","visible":true},"Type":{"index":4,"name":"Type","type":"string","filter":"facet","visible":true},"Message":{"index":5,"name":"Message","type":"string","full_width":true,"options":["full_width","wrap","visible","main_text","fts"]}}
+"columns":{"timestamp":{"index":0,"name":"timestamp","type":"string","sort":"descending|fixed","sticky":true,"visible":true},"Priority":{"index":1,"name":"Priority","type":"string","visualization":"pill","filter":"facet","visible":true,"sticky":true},"Source":{"index":2,"name":"Source","type":"string","filter":"facet","visible":true},"Type":{"index":3,"name":"Type","type":"string","filter":"facet","visible":true},"Message":{"index":4,"name":"Message","type":"string","full_width":true,"options":["full_width","wrap","visible","main_text","fts"]},"rowOptions":{"index":5,"name":"rowOptions","type":"none","visualization":"rowOptions","dummy":true}}
 EOF
 }
 
@@ -148,6 +165,7 @@ sources_json() {
 	[ -n "$(source_file_path easytierweb)" ] && print_source_option easytierweb "EasyTier Web log" file "EasyTier Web log" 0
 	[ -n "$(source_file_path openlist2)" ] && print_source_option openlist2 "OpenList2 log" file "OpenList2 runtime log" 0
 	zerotier_available && print_source_option zerotier-logread "ZeroTier logread" logd "ZeroTier messages from OpenWrt logread" 0
+	kernel_dmesg_available && print_source_option kernel-dmesg "Kernel dmesg" kernel "Kernel ring buffer and boot messages" 0
 	[ -n "$(source_file_path apk)" ] && print_source_option apk "APK log" file "APK package log" 0
 	printf ']}]'
 }
@@ -206,6 +224,7 @@ send_logs() {
 			logread 2>/dev/null | tail -n "$last" >>"$tmp"
 		fi
 	fi
+	append_kernel_dmesg_source "$payload" "$tmp" "$last"
 	append_file_source "$payload" openclash "OpenClash" notice "$tmp" "$last"
 	append_file_source "$payload" openclash-start "OpenClash start" notice "$tmp" "$last"
 	append_file_source "$payload" passwall "PassWall" info "$tmp" "$last"
@@ -239,7 +258,7 @@ send_logs() {
 	printf ','
 	printf '"data":['
 
-	awk -v now_text="$(date '+%m-%d %H:%M:%S')" -v query="$query" -v max="$last" -v count_file="$count_tmp" -v facet_file="$facet_tmp" '
+	awk -v now_text="$(date '+%m-%d %H:%M:%S')" -v boot_epoch="$(awk '/^btime / { print $2; exit }' /proc/stat 2>/dev/null)" -v query="$query" -v max="$last" -v count_file="$count_tmp" -v facet_file="$facet_tmp" '
 	function esc(s, out, i, c) {
 		out = "";
 		for (i = 1; i <= length(s); i++) {
@@ -279,16 +298,35 @@ send_logs() {
 		sub(/[[:space:]]+$/, "", s);
 		return s;
 	}
-	function log_time(line, parts, mon, date_part) {
+	function format_time(date_part, time_part, parts) {
+		gsub(/\//, "-", date_part);
+		split(date_part, parts, "-");
+		if (parts[1] != "" && parts[2] != "" && parts[3] != "") {
+			return two_digits(parts[2]) "-" two_digits(parts[3]) " " time_part;
+		}
+		return date_part " " time_part;
+	}
+	function dmesg_time(line, inner, seconds, epoch) {
+		if (boot_epoch == "") return "";
+		if (match(line, /\[[[:space:]]*[0-9]+(\.[0-9]+)?\]/)) {
+			inner = substr(line, RSTART + 1, RLENGTH - 2);
+			gsub(/^[[:space:]]+/, "", inner);
+			seconds = int(inner + 0);
+			epoch = int(boot_epoch + seconds);
+			return strftime("%m-%d %H:%M:%S", epoch);
+		}
+		return "";
+	}
+	function log_time(line, parts, mon, date_part, dt) {
+		dt = dmesg_time(line);
+		if (dt != "") return dt;
 		if (match(line, /[0-9][0-9][0-9][0-9][-\/][0-9][0-9][-\/][0-9][0-9][T ][0-9][0-9]:[0-9][0-9]:[0-9][0-9]/)) {
 			date_part = substr(line, RSTART, 10);
-			gsub(/\//, "-", date_part);
-			return substr(date_part, 6, 5) " " substr(line, RSTART + 11, 8);
+			return format_time(date_part, substr(line, RSTART + 11, 8));
 		}
 		if (match(line, /[0-9][0-9][0-9][0-9]\/[0-9][0-9]\/[0-9][0-9][[:space:]]+-[[:space:]]+[0-9][0-9]:[0-9][0-9]:[0-9][0-9]/)) {
 			date_part = substr(line, RSTART, 10);
-			gsub(/\//, "-", date_part);
-			return substr(date_part, 6, 5) " " substr(line, RSTART + 13, 8);
+			return format_time(date_part, substr(line, RSTART + 13, 8));
 		}
 		split(line, parts, " ");
 		if (parts[2] ~ /^[A-Z][a-z][a-z]$/ && parts[3] ~ /^[0-9][0-9]?$/ && parts[4] ~ /^[0-9][0-9]:[0-9][0-9]:[0-9][0-9]$/ && parts[5] ~ /^[0-9][0-9][0-9][0-9]$/) {
@@ -403,6 +441,13 @@ send_logs() {
 				return "info";
 			}
 		}
+		if (source_name == "Kernel dmesg") {
+			if (line ~ /^<[0-3]>/) return "error";
+			if (line ~ /^<4>/) return "warning";
+			if (line ~ /^<5>/) return "notice";
+			if (line ~ /^<7>/) return "debug";
+			return "info";
+		}
 		return fallback;
 	}
 	function file_message(source_name, line, msg, clean) {
@@ -427,6 +472,11 @@ send_logs() {
 			return clean;
 		}
 		if (source_name == "ZeroTier") return message(line);
+		if (source_name == "Kernel dmesg") {
+			sub(/^<[0-9]+>/, "", line);
+			sub(/^\[[^]]+\][[:space:]]*/, "", line);
+			return line;
+		}
 		return line;
 	}
 	function log_type(source_name, text, module, thread, clean, lower) {
@@ -467,6 +517,12 @@ send_logs() {
 			if (lower ~ /zerotier-one/) return "Daemon";
 			return "ZeroTier";
 		}
+		if (source_name == "Kernel dmesg") {
+			if (lower ~ /linux version|command line|bios|efi|acpi|memory|cpu|smp|init/) return "Boot";
+			if (lower ~ /usb|pci|nvme|sata|ata|sd[a-z]|block/) return "Hardware";
+			if (lower ~ /fault|segfault|trap|oops|panic|error|fail/) return "Fault";
+			return "Kernel";
+		}
 		return "-";
 	}
 	function category(source_name, text) {
@@ -489,6 +545,7 @@ send_logs() {
 		if (source_name ~ /Netdata/ || source_name == "netdata") return "Netdata";
 		if (source_name == "OpenList2") return "OpenList2";
 		if (source_name == "ZeroTier") return "ZeroTier";
+		if (source_name == "Kernel dmesg") return "Kernel";
 		if (source_name == "uwsgi-luci" || source_name == "uhttpd") return "LuCI";
 		if (source_name == "tailscaled") return "Tailscale";
 		if (source_name == "smbd" || source_name == "nmbd") return "Samba";
@@ -534,7 +591,7 @@ send_logs() {
 			t = log_type(s, type_text);
 			msg = trim(row_source[i] != "" ? file_message(s, rows[i]) : raw_msg);
 			c = category(s, raw_msg);
-			printf "%s[\"%s\",{\"rowOptions\":{\"severity\":\"%s\",\"Category\":\"%s\",\"Facility\":\"%s\",\"PID\":\"%s\"}},\"%s\",\"%s\",\"%s\",\"%s\"]", sep, esc(ts), p, esc(c), esc(f), esc(process_id), p, esc(s), esc(t), esc(msg);
+			printf "%s[\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",{\"rowOptions\":{\"severity\":\"%s\",\"Category\":\"%s\",\"Facility\":\"%s\",\"PID\":\"%s\"}}]", sep, esc(ts), p, esc(s), esc(t), esc(msg), p, esc(c), esc(f), esc(process_id);
 			priority_count[p]++;
 			facility_count[f]++;
 			source_count[s]++;
