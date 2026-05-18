@@ -58,8 +58,15 @@ source_file_path() {
 		appfilter) [ -s /tmp/log/appfilter.log ] && printf '%s\n' /tmp/log/appfilter.log || { [ -s /var/log/appfilter.log ] && printf '%s\n' /var/log/appfilter.log; } ;;
 		easytier) [ -s /tmp/easytier.log ] && printf '%s\n' /tmp/easytier.log ;;
 		easytierweb) [ -s /tmp/easytierweb.log ] && printf '%s\n' /tmp/easytierweb.log ;;
+		openlist2) [ -s /tmp/log/openlist2.log ] && printf '%s\n' /tmp/log/openlist2.log || { [ -s /var/log/openlist2.log ] && printf '%s\n' /var/log/openlist2.log; } ;;
 		apk) [ -s /tmp/log/apk.log ] && printf '%s\n' /tmp/log/apk.log || { [ -s /var/log/apk.log ] && printf '%s\n' /var/log/apk.log; } ;;
 	esac
+}
+
+zerotier_available() {
+	ps 2>/dev/null | grep -qi '[z]erotier' && return 0
+	logread 2>/dev/null | tail -n 200 | grep -Eiq 'zerotier|ZeroTier|zt[[:alnum:]]{6,}' && return 0
+	return 1
 }
 
 source_selected() {
@@ -90,9 +97,32 @@ append_file_source() {
 	done >>"$out"
 }
 
+append_zerotier_source() {
+	payload="$1"
+	out="$2"
+	limit="$3"
+
+	source_selected "$payload" zerotier-logread || return
+
+	logread 2>/dev/null |
+		tail -n 1000 |
+		grep -Ei 'zerotier|ZeroTier|zt[[:alnum:]]{6,}' |
+		tail -n "$limit" |
+		while IFS= read -r file_line; do
+			level="info"
+			case "$file_line" in
+				*.err:*|*.err\ *|*.error:*|*.error\ *|*.crit:*|*.crit\ *|*.alert:*|*.alert\ *|*.emerg:*|*.emerg\ *) level="error" ;;
+				*.warn:*|*.warn\ *|*.warning:*|*.warning\ *) level="warning" ;;
+				*.notice:*|*.notice\ *) level="notice" ;;
+				*.debug:*|*.debug\ *) level="debug" ;;
+			esac
+			printf '__NETDATA_FILE__%s\t%s\t%s\n' "ZeroTier" "$level" "$file_line"
+		done >>"$out"
+}
+
 columns_json() {
 	cat <<'EOF'
-"columns":{"timestamp":{"index":0,"name":"Time","type":"string","sort":"descending|fixed","sticky":true,"visible":true},"PRIORITY":{"index":1,"name":"Priority","type":"string","filter":"facet","visible":true,"sticky":true},"FACILITY":{"index":2,"name":"Facility","type":"string","filter":"facet","visible":true},"SYSLOG_IDENTIFIER":{"index":3,"name":"Source","type":"string","filter":"facet","visible":true},"PID":{"index":4,"name":"PID","type":"string","filter":"facet","visible":true},"CATEGORY":{"index":5,"name":"Category","type":"string","filter":"facet","visible":true},"MESSAGE":{"index":6,"name":"Message","type":"string","full_width":true,"options":["full_width","wrap","visible","main_text","fts"]}}
+"columns":{"timestamp":{"index":0,"name":"Time","type":"string","sort":"descending|fixed","sticky":true,"visible":true},"rowOptions":{"index":1,"name":"rowOptions","type":"none","visualization":"rowOptions","dummy":true},"Priority":{"index":2,"name":"Priority","type":"string","filter":"facet","visible":true,"sticky":true},"Source":{"index":3,"name":"Source","type":"string","filter":"facet","visible":true},"Type":{"index":4,"name":"Type","type":"string","filter":"facet","visible":true},"Message":{"index":5,"name":"Message","type":"string","full_width":true,"options":["full_width","wrap","visible","main_text","fts"]}}
 EOF
 }
 
@@ -116,6 +146,8 @@ sources_json() {
 	[ -n "$(source_file_path appfilter)" ] && print_source_option appfilter "AppFilter log" file "AppFilter log" 0
 	[ -n "$(source_file_path easytier)" ] && print_source_option easytier "EasyTier log" file "EasyTier log" 0
 	[ -n "$(source_file_path easytierweb)" ] && print_source_option easytierweb "EasyTier Web log" file "EasyTier Web log" 0
+	[ -n "$(source_file_path openlist2)" ] && print_source_option openlist2 "OpenList2 log" file "OpenList2 runtime log" 0
+	zerotier_available && print_source_option zerotier-logread "ZeroTier logread" logd "ZeroTier messages from OpenWrt logread" 0
 	[ -n "$(source_file_path apk)" ] && print_source_option apk "APK log" file "APK package log" 0
 	printf ']}]'
 }
@@ -150,14 +182,17 @@ send_logs() {
 	tx="$1"
 	function="$2"
 	payload="$3"
+	default_last=1000
+	max_last=5000
 
 	last="$(extract_param "$function" last)"
 	[ -n "$last" ] || last="$(json_number_param "$payload" last)"
 	case "$last" in
-		''|*[!0-9]*) last=200 ;;
+		''|*[!0-9]*) last="$default_last" ;;
 	esac
 	[ "$last" -lt 1 ] && last=1
-	[ "$last" -gt 500 ] && last=500
+	[ "$last" -lt "$default_last" ] && last="$default_last"
+	[ "$last" -gt "$max_last" ] && last="$max_last"
 
 	query="$(extract_param "$function" query)"
 	[ -n "$query" ] || query="$(json_string_param "$payload" query)"
@@ -187,6 +222,8 @@ send_logs() {
 	append_file_source "$payload" appfilter "AppFilter" info "$tmp" "$last"
 	append_file_source "$payload" easytier "EasyTier" info "$tmp" "$last"
 	append_file_source "$payload" easytierweb "EasyTier Web" info "$tmp" "$last"
+	append_file_source "$payload" openlist2 "OpenList2" info "$tmp" "$last"
+	append_zerotier_source "$payload" "$tmp" "$last"
 	append_file_source "$payload" apk "APK" info "$tmp" "$last"
 
 	result_begin "$tx" 200
@@ -202,7 +239,7 @@ send_logs() {
 	printf ','
 	printf '"data":['
 
-	awk -v now_text="$(date '+%Y-%m-%d %H:%M:%S')" -v query="$query" -v max="$last" -v count_file="$count_tmp" -v facet_file="$facet_tmp" '
+	awk -v now_text="$(date '+%m-%d %H:%M:%S')" -v query="$query" -v max="$last" -v count_file="$count_tmp" -v facet_file="$facet_tmp" '
 	function esc(s, out, i, c) {
 		out = "";
 		for (i = 1; i <= length(s); i++) {
@@ -232,17 +269,32 @@ send_logs() {
 	function two_digits(value) {
 		return sprintf("%02d", value + 0);
 	}
+	function strip_ansi(s, esc_char) {
+		esc_char = sprintf("%c", 27);
+		gsub(esc_char "\\[[0-9;]*m", "", s);
+		return s;
+	}
+	function trim(s) {
+		sub(/^[[:space:]]+/, "", s);
+		sub(/[[:space:]]+$/, "", s);
+		return s;
+	}
 	function log_time(line, parts, mon, date_part) {
 		if (match(line, /[0-9][0-9][0-9][0-9][-\/][0-9][0-9][-\/][0-9][0-9][T ][0-9][0-9]:[0-9][0-9]:[0-9][0-9]/)) {
 			date_part = substr(line, RSTART, 10);
 			gsub(/\//, "-", date_part);
-			return date_part " " substr(line, RSTART + 11, 8);
+			return substr(date_part, 6, 5) " " substr(line, RSTART + 11, 8);
+		}
+		if (match(line, /[0-9][0-9][0-9][0-9]\/[0-9][0-9]\/[0-9][0-9][[:space:]]+-[[:space:]]+[0-9][0-9]:[0-9][0-9]:[0-9][0-9]/)) {
+			date_part = substr(line, RSTART, 10);
+			gsub(/\//, "-", date_part);
+			return substr(date_part, 6, 5) " " substr(line, RSTART + 13, 8);
 		}
 		split(line, parts, " ");
 		if (parts[2] ~ /^[A-Z][a-z][a-z]$/ && parts[3] ~ /^[0-9][0-9]?$/ && parts[4] ~ /^[0-9][0-9]:[0-9][0-9]:[0-9][0-9]$/ && parts[5] ~ /^[0-9][0-9][0-9][0-9]$/) {
 			mon = month_number(parts[2]);
 			if (mon >= 1 && mon <= 12) {
-				return parts[5] "-" two_digits(mon) "-" two_digits(parts[3]) " " parts[4];
+				return two_digits(mon) "-" two_digits(parts[3]) " " parts[4];
 			}
 		}
 		return now_text;
@@ -293,20 +345,150 @@ send_logs() {
 		}
 		return line;
 	}
+	function logfmt_value(line, key, needle, start, rest, i, c, prev, out) {
+		needle = key "=\"";
+		start = index(line, needle);
+		if (start > 0) {
+			rest = substr(line, start + length(needle));
+			out = "";
+			prev = "";
+			for (i = 1; i <= length(rest); i++) {
+				c = substr(rest, i, 1);
+				if (c == "\"" && prev != "\\") break;
+				out = out c;
+				prev = c;
+			}
+			gsub(/\\"/, "\"", out);
+			return out;
+		}
+
+		needle = key "=";
+		start = index(line, needle);
+		if (start > 0) {
+			rest = substr(line, start + length(needle));
+			sub(/[[:space:]].*/, "", rest);
+			return rest;
+		}
+
+		return "";
+	}
+	function detect_file_priority(source_name, line, fallback, level, clean, parts, code) {
+		if (source_name ~ /OpenClash/) {
+			level = tolower(logfmt_value(line, "level"));
+			if (level == "trace" || level == "debug") return "debug";
+			if (level == "info") return "info";
+			if (level == "notice") return "notice";
+			if (level == "warn" || level == "warning") return "warning";
+			if (level == "err" || level == "error" || level == "fatal" || level == "panic") return "error";
+		}
+		if (source_name ~ /Netdata/) {
+			level = tolower(logfmt_value(line, "level"));
+			if (level == "trace" || level == "debug") return "debug";
+			if (level == "info") return "info";
+			if (level == "notice") return "notice";
+			if (level == "warn" || level == "warning") return "warning";
+			if (level == "err" || level == "error" || level == "fatal" || level == "panic") return "error";
+		}
+		if (source_name == "OpenList2") {
+			clean = strip_ansi(line);
+			if (clean ~ /^(ERRO|ERROR)/) return "error";
+			if (clean ~ /^WARN/) return "warning";
+			if (clean ~ /^INFO/) return "info";
+			if (clean ~ /^DEBUG/) return "debug";
+			if (clean ~ /^\[GIN\]/) {
+				split(clean, parts, "|");
+				code = parts[2] + 0;
+				if (code >= 500) return "error";
+				if (code >= 400) return "warning";
+				return "info";
+			}
+		}
+		return fallback;
+	}
+	function file_message(source_name, line, msg, clean) {
+		if (source_name ~ /OpenClash/) {
+			msg = logfmt_value(line, "msg");
+			if (msg != "") {
+				sub(/^\[[^]]+\][[:space:]]*/, "", msg);
+				return msg;
+			}
+		}
+		if (source_name ~ /Netdata/) {
+			msg = logfmt_value(line, "msg");
+			if (msg != "") return msg;
+		}
+		if (source_name == "OpenList2") {
+			clean = strip_ansi(line);
+			if (clean ~ /^\[GIN\]/) {
+				sub(/^\[GIN\][[:space:]]*[0-9][0-9][0-9][0-9]\/[0-9][0-9]\/[0-9][0-9][[:space:]]+-[[:space:]]+[0-9][0-9]:[0-9][0-9]:[0-9][0-9][[:space:]]*\|[[:space:]]*/, "", clean);
+				return clean;
+			}
+			sub(/^(INFO|WARN|ERRO|ERROR|DEBUG)\[[^]]+\][[:space:]]*/, "", clean);
+			return clean;
+		}
+		if (source_name == "ZeroTier") return message(line);
+		return line;
+	}
+	function log_type(source_name, text, module, thread, clean, lower) {
+		lower = tolower(text);
+		if (source_name ~ /OpenClash/) {
+			if (match(text, /^\[[^]]+\]/)) return substr(text, 2, RLENGTH - 2);
+			if (lower ~ /start|connection status|maximum file size/) return "Start";
+			if (lower ~ /dns/) return "DNS";
+			if (lower ~ /tcp|udp|match|direct|reject/) return "TCP";
+			return "OpenClash";
+		}
+		if (source_name ~ /Netdata/) {
+			module = logfmt_value(text, "module");
+			if (module != "") {
+				sub(/\[.*/, "", module);
+				return module;
+			}
+			thread = logfmt_value(text, "thread");
+			if (thread != "") {
+				sub(/\[.*/, "", thread);
+				return thread;
+			}
+			return "Netdata";
+		}
+		if (source_name == "OpenList2") {
+			clean = strip_ansi(text);
+			if (clean ~ /^\[GIN\]/) return "HTTP";
+			if (clean ~ /^INFO/ && tolower(clean) ~ /cache/) return "Cache";
+			if (clean ~ /^INFO/) return "Info";
+			if (clean ~ /^WARN/) return "Warning";
+			if (clean ~ /^(ERRO|ERROR)/) return "Error";
+			if (clean ~ /^DEBUG/) return "Debug";
+			return "OpenList2";
+		}
+		if (source_name == "ZeroTier") {
+			if (text ~ /DHCP|zt[[:alnum:]]{6,}/) return "Interface";
+			if (lower ~ /query|forwarded|reply|download\.zerotier/) return "DNS";
+			if (lower ~ /zerotier-one/) return "Daemon";
+			return "ZeroTier";
+		}
+		return "-";
+	}
 	function category(source_name, text) {
 		if (source_name == "dnsmasq") {
 			if (text ~ / query\[[^]]+\] /) return "DNS Query";
 			if (text ~ / forwarded /) return "DNS Forward";
 			if (text ~ / reply /) return "DNS Reply";
 			if (text ~ / cached /) return "DNS Cache";
+			if (text ~ / config /) return "DNS Config";
+			if (text ~ / nftset / || text ~ / ipset /) return "DNS Set";
 			return "DNS";
 		}
-		if (source_name ~ /OpenClash/) return "OpenClash";
+		if (source_name ~ /OpenClash/) {
+			return "OpenClash";
+		}
 		if (source_name ~ /PassWall/) return "PassWall";
 		if (source_name ~ /SSR Plus/) return "SSR Plus";
 		if (source_name ~ /Nikki/) return "Nikki";
 		if (source_name ~ /Momo/) return "Momo";
 		if (source_name ~ /Netdata/ || source_name == "netdata") return "Netdata";
+		if (source_name == "OpenList2") return "OpenList2";
+		if (source_name == "ZeroTier") return "ZeroTier";
 		if (source_name == "uwsgi-luci" || source_name == "uhttpd") return "LuCI";
 		if (source_name == "tailscaled") return "Tailscale";
 		if (source_name == "smbd" || source_name == "nmbd") return "Samba";
@@ -342,23 +524,29 @@ send_logs() {
 			sep = (returned == 0) ? "" : ",";
 			ts = log_time(rows[i]);
 			p = row_priority[i] != "" ? row_priority[i] : priority(rows[i]);
+			p = row_source[i] != "" ? detect_file_priority(row_source[i], rows[i], p) : p;
 			f = row_source[i] != "" ? "file" : facility(rows[i]);
 			s = row_source[i] != "" ? row_source[i] : source(rows[i]);
 			process_id = row_source[i] != "" ? "-" : pid(rows[i]);
-			msg = row_source[i] != "" ? rows[i] : message(rows[i]);
-			c = category(s, msg);
-			printf "%s[\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",{\"rowOptions\":{\"severity\":\"%s\"}}]", sep, esc(ts), p, esc(f), esc(s), esc(process_id), esc(c), esc(msg), p;
+			raw_msg = row_source[i] != "" ? logfmt_value(rows[i], "msg") : message(rows[i]);
+			if (raw_msg == "") raw_msg = rows[i];
+			type_text = row_source[i] != "" ? rows[i] : raw_msg;
+			t = log_type(s, type_text);
+			msg = trim(row_source[i] != "" ? file_message(s, rows[i]) : raw_msg);
+			c = category(s, raw_msg);
+			printf "%s[\"%s\",{\"rowOptions\":{\"severity\":\"%s\",\"Category\":\"%s\",\"Facility\":\"%s\",\"PID\":\"%s\"}},\"%s\",\"%s\",\"%s\",\"%s\"]", sep, esc(ts), p, esc(c), esc(f), esc(process_id), p, esc(s), esc(t), esc(msg);
 			priority_count[p]++;
 			facility_count[f]++;
 			source_count[s]++;
 			pid_count[process_id]++;
 			category_count[c]++;
+			type_count[t]++;
 			returned++;
 		}
 		print total + 0 > count_file;
 		print returned + 0 >> count_file;
 
-		printf "[{\"id\":\"PRIORITY\",\"name\":\"Priority\",\"order\":1,\"options\":[" > facet_file;
+		printf "[{\"id\":\"Priority\",\"name\":\"Priority\",\"order\":1,\"options\":[" > facet_file;
 		sep = "";
 		split("error warning notice info debug", priorities, " ");
 		for (i = 1; i <= 5; i++) {
@@ -374,14 +562,14 @@ send_logs() {
 				sep = ",";
 			}
 		}
-		printf "]},{\"id\":\"FACILITY\",\"name\":\"Facility\",\"order\":2,\"options\":[" >> facet_file;
+		printf "]},{\"id\":\"Facility\",\"name\":\"Facility\",\"order\":2,\"options\":[" >> facet_file;
 		sep = "";
 		order = 1;
 		for (f in facility_count) {
 			printf "%s%s", sep, json_kv(f, f, facility_count[f], order++) >> facet_file;
 			sep = ",";
 		}
-		printf "]},{\"id\":\"SYSLOG_IDENTIFIER\",\"name\":\"Source\",\"order\":3,\"options\":[" >> facet_file;
+		printf "]},{\"id\":\"Source\",\"name\":\"Source\",\"order\":3,\"options\":[" >> facet_file;
 		sep = "";
 		order = 1;
 		for (s in source_count) {
@@ -395,11 +583,18 @@ send_logs() {
 			printf "%s%s", sep, json_kv(process_id, process_id, pid_count[process_id], order++) >> facet_file;
 			sep = ",";
 		}
-		printf "]},{\"id\":\"CATEGORY\",\"name\":\"Category\",\"order\":5,\"options\":[" >> facet_file;
+		printf "]},{\"id\":\"Category\",\"name\":\"Category\",\"order\":5,\"options\":[" >> facet_file;
 		sep = "";
 		order = 1;
 		for (c in category_count) {
 			printf "%s%s", sep, json_kv(c, c, category_count[c], order++) >> facet_file;
+			sep = ",";
+		}
+		printf "]},{\"id\":\"Type\",\"name\":\"Type\",\"order\":6,\"options\":[" >> facet_file;
+		sep = "";
+		order = 1;
+		for (t in type_count) {
+			printf "%s%s", sep, json_kv(t, t, type_count[t], order++) >> facet_file;
 			sep = ",";
 		}
 		printf "]}]" >> facet_file;

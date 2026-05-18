@@ -34,12 +34,7 @@ PKG_BUILD_DEPENDS:=protobuf/host rust/host libunwind
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/cmake.mk
 include $(INCLUDE_DIR)/nls.mk
-
-ifeq ($(ARCH),x86_64)
-RUST_CARGO_TARGET:=x86_64-unknown-linux-musl
-else ifeq ($(ARCH),aarch64)
-RUST_CARGO_TARGET:=aarch64-unknown-linux-musl
-endif
+include ./rust-targets.mk
 
 define Download/netdata-dashboard
 	FILE:=$(DASHBOARD_SOURCE)
@@ -156,22 +151,7 @@ define Package/netdata/install
 endef
 
 define Package/netdata/postinst
-#!/bin/sh
-root="$${IPKG_INSTROOT}"
-mkdir -p "$${root}/etc/netdata" "$${root}/var/lib/netdata/cloud.d"
-
-if [ ! -e "$${root}/etc/netdata/netdata.conf" ]; then
-	cp "$${root}/usr/lib/netdata/conf.d/netdata.conf.openwrt" "$${root}/etc/netdata/netdata.conf"
-fi
-
-if [ ! -e "$${root}/etc/netdata/claim.conf" ]; then
-	: > "$${root}/etc/netdata/claim.conf"
-fi
-
-touch "$${root}/etc/netdata/.opt-out-from-anonymous-statistics"
-chmod 640 "$${root}/etc/netdata/claim.conf" 2>/dev/null || true
-rm -f "$${root}"/etc/netdata/*.apk-new 2>/dev/null || true
-exit 0
+$(file <./files/netdata.postinst)
 endef
 
 define Package/netdata-dashboard-v3/install
