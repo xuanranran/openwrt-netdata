@@ -81,7 +81,7 @@ source_selected() {
 		*'"source"'*) case "$payload" in *"\"$id\""*) return 0 ;; *) return 1 ;; esac ;;
 	esac
 
-	return 0
+	[ "$id" = "openwrt-logread" ]
 }
 
 append_file_source() {
