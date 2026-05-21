@@ -1,0 +1,75 @@
+name: "Update Netdata Dashboard Hash"
+
+on:
+  schedule:
+    - cron: "0 */2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-dashboard-hash:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Calculate dashboard hash
+        id: hash
+        run: |
+          set -euo pipefail
+
+          MAKEFILE="netdata/Makefile"
+          DASHBOARD_URL="https://app.netdata.cloud/agent.tar.gz"
+          DASHBOARD_FILE="$(mktemp)"
+
+          echo "Downloading $DASHBOARD_URL"
+          curl -fsSL --retry 3 --connect-timeout 20 -o "$DASHBOARD_FILE" "$DASHBOARD_URL"
+
+          NEW_HASH="$(sha256sum "$DASHBOARD_FILE" | awk '{print $1}')"
+          rm -f "$DASHBOARD_FILE"
+
+          if ! printf '%s' "$NEW_HASH" | grep -Eq '^[a-f0-9]{64}$'; then
+            echo "Invalid SHA256: $NEW_HASH"
+            exit 1
+          fi
+
+          CURRENT_HASH="$(grep '^DASHBOARD_HASH:=' "$MAKEFILE" | cut -d= -f2)"
+
+          echo "Current dashboard hash: $CURRENT_HASH"
+          echo "Latest dashboard hash:  $NEW_HASH"
+
+          echo "new_hash=$NEW_HASH" >> "$GITHUB_OUTPUT"
+
+          if [ "$CURRENT_HASH" != "$NEW_HASH" ]; then
+            echo "update_needed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "update_needed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Update Makefile
+        if: steps.hash.outputs.update_needed == 'true'
+        env:
+          NEW_HASH: ${{ steps.hash.outputs.new_hash }}
+        run: |
+          set -euo pipefail
+
+          sed -i "s/^DASHBOARD_HASH:=.*/DASHBOARD_HASH:=$NEW_HASH/" netdata/Makefile
+
+          echo "Updated dashboard hash:"
+          grep '^DASHBOARD_HASH:=' netdata/Makefile
+
+      - name: Commit and push
+        if: steps.hash.outputs.update_needed == 'true'
+        run: |
+          set -euo pipefail
+
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+
+          git add netdata/Makefile
+          git commit -m "netdata: update dashboard hash"
+          git push origin HEAD:${{ github.ref }}
