@@ -1,6 +1,7 @@
 """Check module selection using GNU make without an OpenWrt SDK."""
 
 from pathlib import Path
+import os
 import shutil
 import subprocess
 import tempfile
@@ -111,6 +112,23 @@ class PackageSelection(unittest.TestCase):
         self.assertIn("DEPENDS:=+netdata +libcups +libpng +libjpeg +libusb-1.0 +zlib", output)
         self.assertIn("/install/plugin-cups/. /stage/", output)
         self.assertIn("/target/usr/lib/libcups.so.* /stage/usr/lib/", output)
+
+    @unittest.skipUnless(shutil.which("cmake") and shutil.which("go"), "CMake and Go required")
+    def test_snmp_profile_generator_uses_host_go_platform(self):
+        patch = (ROOT / "netdata/patches/007-run-snmp-profile-generator-on-build-host.patch").read_text()
+        arguments = []
+        for line in patch.splitlines():
+            if line.startswith("+                "):
+                arguments.extend(line[1:].split())
+        self.assertIn("GOENV=off", arguments)
+        for variable in ("GOOS", "GOARCH", "GOARM", "GOARM64", "GOMIPS", "GOMIPS64"):
+            self.assertIn("--unset=" + variable, arguments)
+        env = dict(os.environ, GOOS="linux", GOARCH="arm64", GOARM="7", GOARM64="v8.0")
+        result = subprocess.run(["cmake", "-E", "env", *arguments, "go", "env",
+                                 "GOOS", "GOARCH", "GOHOSTOS", "GOHOSTARCH"],
+                                env=env, capture_output=True, text=True, check=True)
+        platform = result.stdout.splitlines()
+        self.assertEqual(platform[:2], platform[2:])
 
     def test_metadata_discovers_conditional_host_toolchains(self):
         output = evaluate([], dump=True)
