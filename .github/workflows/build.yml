@@ -75,10 +75,10 @@ jobs:
         id: sdk-cache
         uses: actions/cache/restore@v6.1.0
         with:
-          path: .sdk/x86-64
-          key: netdata-sdk-x86-64-${{ steps.sdk.outputs.hash }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/netdata-sdk/x86-64
+          key: netdata-sdk-x86-64-shortpath-${{ steps.sdk.outputs.hash }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
-            netdata-sdk-x86-64-${{ steps.sdk.outputs.hash }}-
+            netdata-sdk-x86-64-shortpath-${{ steps.sdk.outputs.hash }}-
       - name: Compile agent and package modules
         env:
           SDK_FILE: ${{ steps.sdk.outputs.file }}
@@ -91,7 +91,7 @@ jobs:
         if: success() && matrix.arch == 'x86_64' && github.event_name != 'pull_request'
         uses: actions/cache/save@v6.1.0
         with:
-          path: .sdk/x86-64
+          path: ${{ runner.temp }}/netdata-sdk/x86-64
           key: ${{ steps.sdk-cache.outputs.cache-primary-key }}
       - name: Upload build log
         if: always()

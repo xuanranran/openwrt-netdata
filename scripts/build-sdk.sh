@@ -31,16 +31,25 @@ fi
 [[ "$SDK_HASH" =~ ^[a-f0-9]{64}$ ]]
 [[ "$SDK_FILE" != */* ]]
 
-SDK_DIR="$ROOT/.sdk/$TARGET-$SUBTARGET/$SDK_HASH"
+# Python wheel installers reject interpreter paths longer than 124 characters.
+# A short physical path is needed; a symlink into the checkout is insufficient.
+SDK_CACHE_ROOT="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/netdata-sdk"
+mkdir -p "$SDK_CACHE_ROOT"
+SDK_CACHE_ROOT="$(cd "$SDK_CACHE_ROOT" && pwd -P)"
+SDK_DIR="$SDK_CACHE_ROOT/$TARGET-$SUBTARGET/${SDK_HASH:0:12}"
 DIST="$ROOT/dist/$EXPECTED_PKG_ARCH"
 mkdir -p "$SDK_DIR" "$DIST"
+if [ -f "$SDK_DIR/.netdata-sdk-ready" ] && \
+    [ "$(< "$SDK_DIR/.netdata-sdk-ready")" != "$SDK_HASH" ]; then
+    echo "SDK cache checksum mismatch: $SDK_DIR" >&2; exit 1
+fi
 if [ ! -f "$SDK_DIR/.netdata-sdk-ready" ]; then
     ARCHIVE="$(mktemp)"
     trap 'rm -f "$ARCHIVE"' EXIT
     curl -fLsS --retry 3 --connect-timeout 20 --max-time 900 "$BASE/$SDK_FILE" -o "$ARCHIVE"
     printf '%s  %s\n' "$SDK_HASH" "$ARCHIVE" | sha256sum -c -
     tar -xf "$ARCHIVE" -C "$SDK_DIR" --strip-components=1
-    touch "$SDK_DIR/.netdata-sdk-ready"
+    printf '%s\n' "$SDK_HASH" > "$SDK_DIR/.netdata-sdk-ready"
 fi
 
 cd "$SDK_DIR"
@@ -69,7 +78,7 @@ fi
 
 # Replace only this feed's copy; cached dependencies remain available.
 PACKAGE_ROOT="$SDK_DIR/package/netdata-feed"
-case "$PACKAGE_ROOT" in "$ROOT/.sdk/"*/package/netdata-feed) ;; *) exit 2 ;; esac
+case "$(realpath -m "$PACKAGE_ROOT")" in "$SDK_DIR/package/netdata-feed") ;; *) exit 2 ;; esac
 rm -rf "$PACKAGE_ROOT"
 mkdir -p "$PACKAGE_ROOT"
 cp -a "$ROOT/netdata" "$ROOT/luci-app-netdata" "$PACKAGE_ROOT/"

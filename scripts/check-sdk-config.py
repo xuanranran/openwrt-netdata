@@ -10,6 +10,13 @@ def read_config(text):
     return dict(re.findall(r"^(CONFIG_[A-Za-z0-9_-]+)=(.*)$", text, re.MULTILINE))
 
 
+def check_sdk_path(root):
+    interpreter = str(root) + "/staging_dir/hostpkg/bin/python3.14"
+    if len(interpreter) > 124:
+        return ["SDK path too long for Python package installation: " + interpreter]
+    return []
+
+
 def check_config(config_text, seed_text, log, architecture):
     config = read_config(config_text)
     errors = []
@@ -33,6 +40,7 @@ def main():
     config, seed, log, architecture = sys.argv[1:]
     errors = check_config(Path(config).read_text(), Path(seed).read_text(),
                           Path(log).read_text(errors="replace"), architecture)
+    errors.extend(check_sdk_path(Path(config).resolve().parent))
     if errors:
         print("\n".join(errors), file=sys.stderr)
         return 1

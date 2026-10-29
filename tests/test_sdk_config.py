@@ -40,6 +40,14 @@ class SDKConfig(unittest.TestCase):
             with self.subTest(flag=flag):
                 self.assertTrue(self.check(CONFIG + "CONFIG_" + flag + "=y\n"))
 
+    def test_physical_sdk_path_fits_python_install_limit(self):
+        for target in ("x86-64", "armsr-armv8"):
+            with self.subTest(target=target):
+                root = "/home/runner/work/_temp/netdata-sdk/" + target + "/" + "a" * 12
+                self.assertEqual(SDK_CONFIG.check_sdk_path(root), [])
+                old = "/home/runner/work/openwrt-netdata/openwrt-netdata/.sdk/" + target + "/" + "a" * 64
+                self.assertTrue(SDK_CONFIG.check_sdk_path(old))
+
 
 if __name__ == "__main__":
     unittest.main()
