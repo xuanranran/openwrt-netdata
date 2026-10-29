@@ -9,6 +9,9 @@ ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location("sdk_config", ROOT / "scripts/check-sdk-config.py")
 SDK_CONFIG = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(SDK_CONFIG)
+PRESET_SPEC = importlib.util.spec_from_file_location("sdk_presets", ROOT / "scripts/clear-sdk-presets.py")
+SDK_PRESETS = importlib.util.module_from_spec(PRESET_SPEC)
+PRESET_SPEC.loader.exec_module(SDK_PRESETS)
 SEED = "CONFIG_PACKAGE_netdata=m\nCONFIG_PACKAGE_netdata-plugin-otel=m\n"
 CONFIG = ('CONFIG_TARGET_ARCH_PACKAGES="x86_64"\n' + SEED +
           "CONFIG_PACKAGE_zlib=m\nCONFIG_PACKAGE_libncurses=m\n")
@@ -37,6 +40,9 @@ class SDKConfig(unittest.TestCase):
         self.assertTrue(SDK_CONFIG.check_config(CONFIG, seed, "", "x86_64"))
         self.assertEqual(SDK_CONFIG.check_config(
             CONFIG + "CONFIG_NETDATA_EXTERNAL_TOOLCHAINS=y\n", seed, "", "x86_64"), [])
+        self.assertTrue(SDK_CONFIG.check_config(
+            CONFIG + "CONFIG_NETDATA_EXTERNAL_TOOLCHAINS=y\nCONFIG_NETDATA_FEED_TOOLCHAINS=y\n",
+            seed, "", "x86_64"))
 
     def test_wrong_architecture(self):
         self.assertTrue(self.check(CONFIG.replace('"x86_64"', '"aarch64_generic"')))
@@ -53,6 +59,19 @@ class SDKConfig(unittest.TestCase):
                 self.assertEqual(SDK_CONFIG.check_sdk_path(root), [])
                 old = "/home/runner/work/openwrt-netdata/openwrt-netdata/.sdk/" + target + "/" + "a" * 64
                 self.assertTrue(SDK_CONFIG.check_sdk_path(old))
+
+    def test_clear_only_unrequested_package_presets(self):
+        sdk = ('config PACKAGE_kmod-unrelated\n\ttristate\n\tdefault m\n'
+               'config PACKAGE_zlib\n\tbool\n\tdefault y\n'
+               'config GCC_VERSION\n\tstring\n\tdefault "14.4.0"\n')
+        seed = 'CONFIG_PACKAGE_zlib=m\nCONFIG_TARGET_x86=y\n'
+        result = SDK_PRESETS.clear_presets(seed, sdk)
+        self.assertIn('CONFIG_PACKAGE_zlib=m\n', result)
+        self.assertIn('# CONFIG_PACKAGE_kmod-unrelated is not set\n', result)
+        self.assertNotIn('# CONFIG_PACKAGE_zlib is not set', result)
+        self.assertNotIn('CONFIG_GCC_VERSION', result)
+        self.assertIn('CONFIG_TARGET_x86=y\n', result)
+        self.assertEqual(SDK_PRESETS.clear_presets(result, sdk), result)
 
 
 if __name__ == "__main__":

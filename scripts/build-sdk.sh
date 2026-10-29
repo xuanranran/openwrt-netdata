@@ -117,6 +117,7 @@ COLLECTORS="$(sed -n 's/^NETDATA_GO_COLLECTORS:=//p' "$ROOT/netdata/packages/go-
 for COLLECTOR in $COLLECTORS; do
     printf 'CONFIG_PACKAGE_netdata-collector-%s=m\n' "${COLLECTOR//_/-}" >> .config
 done
+python3 "$ROOT/scripts/clear-sdk-presets.py" .config Config-build.in
 cp .config .config.netdata-seed
 make defconfig 2>&1 | tee netdata-defconfig.log
 python3 "$ROOT/scripts/check-sdk-config.py" .config .config.netdata-seed \

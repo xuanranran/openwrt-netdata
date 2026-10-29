@@ -104,9 +104,11 @@ class PackageSelection(unittest.TestCase):
     def test_metadata_discovers_conditional_host_toolchains(self):
         output = evaluate([], dump=True)
         for plugin in ("go", "scripts", "statsd"):
-            self.assertIn("PACKAGE_netdata-plugin-" + plugin + "&&!NETDATA_EXTERNAL_TOOLCHAINS:golang1.27/host", output)
+            self.assertIn("PACKAGE_netdata-plugin-" + plugin + "&&NETDATA_FEED_TOOLCHAINS:golang1.27/host", output)
         for plugin in ("otel", "netflow", "systemd-journal"):
-            self.assertIn("PACKAGE_netdata-plugin-" + plugin + "&&!NETDATA_EXTERNAL_TOOLCHAINS:rust/host", output)
+            self.assertIn("PACKAGE_netdata-plugin-" + plugin + "&&NETDATA_FEED_TOOLCHAINS:rust/host", output)
+        dependencies = next(line for line in output.splitlines() if line.startswith("DEPENDS="))
+        self.assertNotIn("!", dependencies)
 
     def test_external_sdk_toolchains_are_explicit(self):
         output = evaluate(["go", "otel"], external=True)

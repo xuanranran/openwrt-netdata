@@ -24,6 +24,9 @@ def check_config(config_text, seed_text, log, architecture):
         errors.append("Kconfig reported an error; see netdata-defconfig.log")
     if config.get("CONFIG_TARGET_ARCH_PACKAGES") != '"' + architecture + '"':
         errors.append("SDK ABI mismatch: expected " + architecture)
+    if (config.get("CONFIG_NETDATA_EXTERNAL_TOOLCHAINS") == "y" and
+            config.get("CONFIG_NETDATA_FEED_TOOLCHAINS") == "y"):
+        errors.append("External and feeds host toolchains cannot both be enabled")
     for flag in ("ALL", "ALL_KMODS", "ALL_NONSHARED", "SIGN_EACH_PACKAGE"):
         if config.get("CONFIG_" + flag) == "y":
             errors.append("Unexpected global SDK selection: CONFIG_" + flag)

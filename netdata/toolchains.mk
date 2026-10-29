@@ -4,8 +4,8 @@ NETDATA_GO_SELECTED:=$(strip $(foreach p,go scripts statsd,$(CONFIG_PACKAGE_netd
 NETDATA_RUST_SELECTED:=$(strip $(foreach p,otel netflow systemd-journal,$(CONFIG_PACKAGE_netdata-plugin-$(p))))
 
 # DUMP scans do not load .config; keep conditional dependencies discoverable.
-PKG_BUILD_DEPENDS+=$(foreach p,go scripts statsd,PACKAGE_netdata-plugin-$(p)&&!NETDATA_EXTERNAL_TOOLCHAINS:golang1.27/host)
-PKG_BUILD_DEPENDS+=$(foreach p,otel netflow systemd-journal,PACKAGE_netdata-plugin-$(p)&&!NETDATA_EXTERNAL_TOOLCHAINS:rust/host)
+PKG_BUILD_DEPENDS+=$(foreach p,go scripts statsd,PACKAGE_netdata-plugin-$(p)&&NETDATA_FEED_TOOLCHAINS:golang1.27/host)
+PKG_BUILD_DEPENDS+=$(foreach p,otel netflow systemd-journal,PACKAGE_netdata-plugin-$(p)&&NETDATA_FEED_TOOLCHAINS:rust/host)
 
 ifneq ($(NETDATA_GO_SELECTED),)
 include $(TOPDIR)/feeds/packages/lang/golang/golang-values.mk

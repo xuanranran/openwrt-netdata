@@ -9,6 +9,10 @@ config NETDATA_EXTERNAL_TOOLCHAINS
       from the build environment. The Rust toolchain must include the target
       standard library. Normal OpenWrt builds use the feeds toolchains.
 
+config NETDATA_FEED_TOOLCHAINS
+    bool
+    default y if !NETDATA_EXTERNAL_TOOLCHAINS
+
 config NETDATA_DBENGINE
     bool "DBENGINE historical metrics storage"
     default y
