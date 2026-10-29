@@ -231,6 +231,18 @@ is_package_installed() {
     fi
 }
 
+is_optional_netdata_plugin() {
+    case "$1" in
+        netdata-plugin-logread)
+            return 1
+            ;;
+        netdata-plugin-*|netdata-collector-*|netdata-tools-*)
+            return 0
+            ;;
+    esac
+    return 1
+}
+
 select_install_files() {
     local pattern="$1"
     local file pkg selected skipped forced blocked
@@ -244,6 +256,9 @@ select_install_files() {
         pkg=$(package_name_from_file "$file")
 
         if is_blocked_package "$pkg"; then
+            blocked="${blocked}${pkg}
+"
+        elif is_optional_netdata_plugin "$pkg" && ! is_package_installed "$pkg"; then
             blocked="${blocked}${pkg}
 "
         elif is_force_package "$pkg"; then

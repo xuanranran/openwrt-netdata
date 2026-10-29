@@ -22,12 +22,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout package feed
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
         with:
           path: openwrt-netdata
 
       - name: Checkout OpenWrt
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
         with:
           repository: openwrt/openwrt
           path: openwrt
@@ -81,6 +81,18 @@ jobs:
           CONFIG_GCC_USE_VERSION_15=y
           CONFIG_PACKAGE_netdata=y
           CONFIG_PACKAGE_netdata-dashboard-v3=y
+          CONFIG_PACKAGE_netdata-plugin-logread=y
+          CONFIG_PACKAGE_netdata-plugin-apps=m
+          CONFIG_PACKAGE_netdata-plugin-debugfs=m
+          CONFIG_PACKAGE_netdata-plugin-perf=m
+          CONFIG_PACKAGE_netdata-plugin-slabinfo=m
+          CONFIG_PACKAGE_netdata-plugin-python=m
+          CONFIG_PACKAGE_netdata-plugin-charts=m
+          CONFIG_PACKAGE_netdata-plugin-network-viewer=m
+          CONFIG_PACKAGE_netdata-plugin-local-listeners=m
+          CONFIG_PACKAGE_netdata-plugin-cgroup-network=m
+          CONFIG_PACKAGE_netdata-plugin-nfacct=m
+          CONFIG_PACKAGE_netdata-plugin-cups=m
           CONFIG_PACKAGE_luci-app-netdata=y
           EOF
 
