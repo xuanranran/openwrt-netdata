@@ -55,6 +55,8 @@ def evaluate(selected, core_features=True, dump=False, external=False):
             "$(info OPTIONS=$(strip $(CMAKE_OPTIONS)))\n"
             "$(info DEPENDS=$(PKG_BUILD_DEPENDS))\n"
             "$(info PYTHON=$(strip $(call Package/netdata-plugin-python)))\n"
+            "$(info CUPS=$(strip $(call Package/netdata-plugin-cups)))\n"
+            "$(info CUPS_INSTALL=$(strip $(call Package/netdata-plugin-cups/install,/stage)))\n"
             "$(info INSTALL=$(strip $(call Package/netdata-plugin-apps/install,/stage)))\n"
             "$(info MYSQL=$(strip $(call Package/netdata-collector-mysql/install,/stage)))\n"
             "all:;\n"
@@ -103,6 +105,12 @@ class PackageSelection(unittest.TestCase):
         output = evaluate([], core_features=False)
         self.assertIn("-DENABLE_DBENGINE=Off", output)
         self.assertIn("-DENABLE_LIBUNWIND=Off", output)
+
+    def test_cups_ships_buildonly_library_and_runtime_dependencies(self):
+        output = evaluate(["cups"])
+        self.assertIn("DEPENDS:=+netdata +libcups +libpng +libjpeg +libusb-1.0 +zlib", output)
+        self.assertIn("/install/plugin-cups/. /stage/", output)
+        self.assertIn("/target/usr/lib/libcups.so.* /stage/usr/lib/", output)
 
     def test_metadata_discovers_conditional_host_toolchains(self):
         output = evaluate([], dump=True)
