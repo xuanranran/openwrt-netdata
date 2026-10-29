@@ -61,7 +61,8 @@ def evaluate(selected, core_features=True, dump=False, external=False):
         )
         command = [shutil.which("make") or "make", "--no-print-directory", "-f", str(harness),
                    "TOPDIR=" + root.as_posix(), "INCLUDE_DIR=" + (root / "include").as_posix(),
-                   "PKG_INSTALL_DIR=/install", "STAGING_DIR=/target", "STAGING_DIR_HOSTPKG=/hostpkg"]
+                   "PKG_INSTALL_DIR=/install", "STAGING_DIR=/target", "STAGING_DIR_HOSTPKG=/hostpkg",
+                   "DL_DIR=/downloads", "HOSTCC=host-gcc", "HOST_CFLAGS=-O2", "HOST_LDFLAGS=-L/host/lib"]
         command.extend("CONFIG_PACKAGE_netdata-plugin-" + name + "=m" for name in selected)
         if core_features:
             command.extend(["CONFIG_NETDATA_DBENGINE=y", "CONFIG_NETDATA_LIBUNWIND=y"])
@@ -82,7 +83,9 @@ class PackageSelection(unittest.TestCase):
     def test_core_only(self):
         output = evaluate([])
         self.assertIn("COMPONENTS=netdata\n", output)
-        self.assertNotIn("DOWNLOAD=", output)
+        self.assertIn("DOWNLOAD=netdata-sqlite", output)
+        self.assertNotIn("DOWNLOAD=netdata-dashboard", output)
+        self.assertNotIn("DOWNLOAD=netdata-ebpf-core", output)
         self.assertIn("DEPENDS=protobuf/host", output)
         self.assertNotIn("-DRust_CARGO_TARGET=", output)
         self.assertIn("-DUSE_LTO=On", output)
@@ -109,6 +112,17 @@ class PackageSelection(unittest.TestCase):
             self.assertIn("PACKAGE_netdata-plugin-" + plugin + "&&NETDATA_FEED_TOOLCHAINS:rust/host", output)
         dependencies = next(line for line in output.splitlines() if line.startswith("DEPENDS="))
         self.assertNotIn("!", dependencies)
+        self.assertIn("NETDATA_FEED_TOOLCHAINS:tcl/host", dependencies)
+
+    def test_bundled_sources_use_download_cache_and_host_compiler(self):
+        output = evaluate(["ebpf"])
+        self.assertIn("DOWNLOAD=netdata-ebpf-core", output)
+        self.assertIn("-DSQLITE_SOURCE_ARCHIVE=/downloads/sqlite-src-3530400.zip", output)
+        self.assertIn("-DEBPF_CORE_SOURCE_ARCHIVE=/downloads/netdata-ebpf-co-re-glibc-v1.7.0.3.tar.xz", output)
+        self.assertIn('-DNETDATA_HOST_CC:STRING="host-gcc"', output)
+        patch = (ROOT / "netdata/patches/006-use-local-bundled-source-archives.patch").read_text()
+        self.assertIn('"CC_FOR_BUILD=${NETDATA_HOST_CC}"', patch)
+        self.assertIn('+                CONFIGURE_COMMAND "${CMAKE_COMMAND}" -E env ${SQLITE_HOST_ENV}', patch)
 
     def test_external_sdk_toolchains_are_explicit(self):
         output = evaluate(["go", "otel"], external=True)

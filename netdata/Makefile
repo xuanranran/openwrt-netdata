@@ -41,6 +41,7 @@ endef
 NETDATA_COMPONENTS:=netdata
 NETDATA_PACKAGES:=netdata netdata-dashboard-v3 netdata-plugin-logread
 
+include ./packages/sources.mk
 include ./packages/core.mk
 include ./packages/dashboard.mk
 include ./packages/plugins.mk

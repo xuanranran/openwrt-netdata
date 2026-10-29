@@ -85,7 +85,7 @@ fi
 ./scripts/feeds install \
     zlib libuuid libuv libmnl liblz4 libjson-c libyaml libopenssl libcurl \
     protobuf libzstd libunwind libelf libnetfilter-acct libcups \
-    python3 python3-yaml python3-urllib3 bash libpcre2 golang1.27 rust luci-base
+    python3 python3-yaml python3-urllib3 bash libpcre2 golang1.27 rust tcl luci-base
 
 # Replace only this feed's copy; cached dependencies remain available.
 PACKAGE_ROOT="$SDK_DIR/package/netdata-feed"
