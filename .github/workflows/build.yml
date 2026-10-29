@@ -36,6 +36,7 @@ jobs:
       - run: |
           python3 tests/test_package_selection.py
           python3 tests/test_config_helpers.py
+          python3 tests/test_sdk_config.py
           for script in scripts/*.sh install.sh netdata/files/netdata.init netdata/files/netdata.postinst netdata/files/logread.plugin netdata/files/update-go-config netdata/files/render-config; do
             bash -n "$script"
           done

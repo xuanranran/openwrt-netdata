@@ -44,9 +44,15 @@ if [ ! -f "$SDK_DIR/.netdata-sdk-ready" ]; then
 fi
 
 cd "$SDK_DIR"
-./scripts/feeds update packages luci
-./scripts/feeds install -a -p packages
-./scripts/feeds install -a -p luci
+./scripts/feeds update base packages luci
+# Clear feed links from older cached builds, not the compiled dependencies.
+./scripts/feeds uninstall -a
+# Install only the sources needed by the enabled Netdata modules. The feeds
+# installer recursively installs their runtime and host build dependencies.
+./scripts/feeds install \
+    zlib libuuid libuv libmnl liblz4 libjson-c libyaml libopenssl libcurl \
+    protobuf libzstd libunwind libelf libnetfilter-acct libcups \
+    python3 python3-yaml python3-urllib3 bash libpcre2 golang1.27 rust luci-base
 
 # Replace only this feed's copy; cached dependencies remain available.
 PACKAGE_ROOT="$SDK_DIR/package/netdata-feed"
@@ -77,11 +83,10 @@ COLLECTORS="$(sed -n 's/^NETDATA_GO_COLLECTORS:=//p' "$ROOT/netdata/packages/go-
 for COLLECTOR in $COLLECTORS; do
     printf 'CONFIG_PACKAGE_netdata-collector-%s=m\n' "${COLLECTOR//_/-}" >> .config
 done
-make defconfig
-ACTUAL_ARCH="$(sed -n 's/^CONFIG_TARGET_ARCH_PACKAGES="\([^"]*\)"/\1/p' .config)"
-[ "$ACTUAL_ARCH" = "$EXPECTED_PKG_ARCH" ] || {
-    echo "SDK ABI mismatch: expected $EXPECTED_PKG_ARCH, got $ACTUAL_ARCH" >&2; exit 1;
-}
+cp .config .config.netdata-seed
+make defconfig 2>&1 | tee netdata-defconfig.log
+python3 "$ROOT/scripts/check-sdk-config.py" .config .config.netdata-seed \
+    netdata-defconfig.log "$EXPECTED_PKG_ARCH"
 JOBS="${BUILD_JOBS:-$(nproc)}"
 make package/netdata-feed/netdata/clean
 make package/netdata-feed/luci-app-netdata/clean
