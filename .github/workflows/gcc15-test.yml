@@ -2,12 +2,6 @@ name: GCC15 TEST
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-      - master
-    paths:
-      - '.github/workflows/gcc15-test.yml'
 
 permissions:
   contents: read
