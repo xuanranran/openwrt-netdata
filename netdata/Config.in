@@ -1,6 +1,14 @@
 # Optional library gates must not depend back on the package selecting them.
 menu "Core features"
 
+config NETDATA_EXTERNAL_TOOLCHAINS
+    bool "Use preinstalled Go and Rust host toolchains"
+    default n
+    help
+      For SDK CI builds, use NETDATA_GO_ROOT, NETDATA_RUSTC and NETDATA_CARGO
+      from the build environment. The Rust toolchain must include the target
+      standard library. Normal OpenWrt builds use the feeds toolchains.
+
 config NETDATA_DBENGINE
     bool "DBENGINE historical metrics storage"
     default y

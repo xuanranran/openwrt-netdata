@@ -28,11 +28,11 @@ def check_config(config_text, seed_text, log, architecture):
         if config.get("CONFIG_" + flag) == "y":
             errors.append("Unexpected global SDK selection: CONFIG_" + flag)
     required = {name for name, value in read_config(seed_text).items()
-                if name.startswith("CONFIG_PACKAGE_") and value in ("y", "m")}
+                if name.startswith(("CONFIG_PACKAGE_", "CONFIG_NETDATA_")) and value in ("y", "m")}
     required.update(("CONFIG_PACKAGE_zlib", "CONFIG_PACKAGE_libncurses"))
     for name in sorted(required):
         if config.get(name) not in ("y", "m"):
-            errors.append("Missing selected package or dependency: " + name)
+            errors.append("Missing selected package, feature or dependency: " + name)
     return errors
 
 

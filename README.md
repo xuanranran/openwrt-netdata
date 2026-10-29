@@ -146,7 +146,12 @@ not a claim that those features are impossible to port.
 The SDK workflow builds all listed modules for x86_64 and aarch64 SNAPSHOT.
 It downloads and verifies the official SDK, builds target code and dependencies,
 and publishes after both architectures succeed. Only x86_64 persists an SDK
-cache, scoped to the SDK archive hash; older reference caches are pruned.
+cache, scoped to the SDK archive hash; older reference caches are pruned per branch.
+Completed SDK dependencies are cached even after a package build fails so retries
+do not rebuild them. Netdata itself is cleaned before each build.
+SDK CI uses official prebuilt Go and Rust host toolchains with the matching musl
+Rust target. Normal OpenWrt builds default to the feeds toolchains; both modes
+pass explicit compiler paths to avoid picking up an unrelated system Rust.
 The source archive is pinned by SHA256; the rolling V3 dashboard is not pinned.
 The installer upgrades optional modules already installed on the device and skips
 new optional modules. Install their APK/IPK files separately to add collectors.

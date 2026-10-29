@@ -6,7 +6,8 @@ MODE="${1:-build}"
 TARGET="${2:?target required}"
 SUBTARGET="${3:?subtarget required}"
 case "$TARGET/$SUBTARGET" in
-    x86/64|armsr/armv8) ;;
+    x86/64) RUST_TARGET=x86_64-unknown-linux-musl ;;
+    armsr/armv8) RUST_TARGET=aarch64-unknown-linux-musl ;;
     *) echo "Unsupported SDK target: $TARGET/$SUBTARGET" >&2; exit 2 ;;
 esac
 BASE="https://downloads.openwrt.org/snapshots/targets/$TARGET/$SUBTARGET"
@@ -30,6 +31,16 @@ fi
 : "${EXPECTED_PKG_ARCH:?Package architecture required}"
 [[ "$SDK_HASH" =~ ^[a-f0-9]{64}$ ]]
 [[ "$SDK_FILE" != */* ]]
+
+# Reuse official host binaries instead of bootstrapping Rust/LLVM in every SDK.
+command -v go >/dev/null
+rustup toolchain install stable --profile minimal --no-self-update
+rustup target add --toolchain stable "$RUST_TARGET"
+export NETDATA_GO_ROOT="$(go env GOROOT)"
+export NETDATA_RUSTC="$(rustup which --toolchain stable rustc)"
+export NETDATA_CARGO="$(rustup which --toolchain stable cargo)"
+"$NETDATA_GO_ROOT/bin/go" version
+"$NETDATA_RUSTC" --version
 
 # Python wheel installers reject interpreter paths longer than 124 characters.
 # A short physical path is needed; a symlink into the checkout is insufficient.
@@ -89,6 +100,7 @@ cat > .config <<'EOF'
 # CONFIG_ALL_KMODS is not set
 # CONFIG_ALL_NONSHARED is not set
 # CONFIG_SIGN_EACH_PACKAGE is not set
+CONFIG_NETDATA_EXTERNAL_TOOLCHAINS=y
 CONFIG_PACKAGE_netdata=m
 CONFIG_PACKAGE_netdata-dashboard-v3=m
 CONFIG_PACKAGE_netdata-plugin-logread=m

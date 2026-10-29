@@ -32,6 +32,12 @@ class SDKConfig(unittest.TestCase):
     def test_dropped_module_selection(self):
         self.assertTrue(self.check(CONFIG.replace("CONFIG_PACKAGE_netdata-plugin-otel=m\n", "")))
 
+    def test_external_toolchain_mode_cannot_be_silently_dropped(self):
+        seed = SEED + "CONFIG_NETDATA_EXTERNAL_TOOLCHAINS=y\n"
+        self.assertTrue(SDK_CONFIG.check_config(CONFIG, seed, "", "x86_64"))
+        self.assertEqual(SDK_CONFIG.check_config(
+            CONFIG + "CONFIG_NETDATA_EXTERNAL_TOOLCHAINS=y\n", seed, "", "x86_64"), [])
+
     def test_wrong_architecture(self):
         self.assertTrue(self.check(CONFIG.replace('"x86_64"', '"aarch64_generic"')))
 

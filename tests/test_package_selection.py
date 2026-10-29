@@ -30,7 +30,7 @@ MODULES = {
 }
 
 
-def evaluate(selected, core_features=True):
+def evaluate(selected, core_features=True, dump=False, external=False):
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
         (root / "include").mkdir()
@@ -61,10 +61,15 @@ def evaluate(selected, core_features=True):
         )
         command = [shutil.which("make") or "make", "--no-print-directory", "-f", str(harness),
                    "TOPDIR=" + root.as_posix(), "INCLUDE_DIR=" + (root / "include").as_posix(),
-                   "PKG_INSTALL_DIR=/install"]
+                   "PKG_INSTALL_DIR=/install", "STAGING_DIR=/target", "STAGING_DIR_HOSTPKG=/hostpkg"]
         command.extend("CONFIG_PACKAGE_netdata-plugin-" + name + "=m" for name in selected)
         if core_features:
             command.extend(["CONFIG_NETDATA_DBENGINE=y", "CONFIG_NETDATA_LIBUNWIND=y"])
+        if dump:
+            command.append("DUMP=1")
+        if external:
+            command.extend(["CONFIG_NETDATA_EXTERNAL_TOOLCHAINS=y", "NETDATA_GO_ROOT=/external/go",
+                            "NETDATA_RUSTC=/external/rustc", "NETDATA_CARGO=/external/cargo"])
         if "dashboard" in selected:
             command.append("CONFIG_PACKAGE_netdata-dashboard-v3=m")
         result = subprocess.run(command, cwd=ROOT / "netdata", capture_output=True, text=True)
@@ -79,7 +84,7 @@ class PackageSelection(unittest.TestCase):
         self.assertIn("COMPONENTS=netdata\n", output)
         self.assertNotIn("DOWNLOAD=", output)
         self.assertIn("DEPENDS=protobuf/host", output)
-        self.assertNotIn("rust/host", output)
+        self.assertNotIn("-DRust_CARGO_TARGET=", output)
         self.assertIn("-DUSE_LTO=On", output)
         for component, option in MODULES.values():
             self.assertIn("-D" + option + "=Off", output)
@@ -96,6 +101,20 @@ class PackageSelection(unittest.TestCase):
         self.assertIn("-DENABLE_DBENGINE=Off", output)
         self.assertIn("-DENABLE_LIBUNWIND=Off", output)
 
+    def test_metadata_discovers_conditional_host_toolchains(self):
+        output = evaluate([], dump=True)
+        for plugin in ("go", "scripts", "statsd"):
+            self.assertIn("PACKAGE_netdata-plugin-" + plugin + "&&!NETDATA_EXTERNAL_TOOLCHAINS:golang1.27/host", output)
+        for plugin in ("otel", "netflow", "systemd-journal"):
+            self.assertIn("PACKAGE_netdata-plugin-" + plugin + "&&!NETDATA_EXTERNAL_TOOLCHAINS:rust/host", output)
+
+    def test_external_sdk_toolchains_are_explicit(self):
+        output = evaluate(["go", "otel"], external=True)
+        self.assertIn("-DRust_COMPILER=/external/rustc", output)
+        self.assertIn("-DRust_CARGO=/external/cargo", output)
+        self.assertIn("-DRust_RESOLVE_RUSTUP_TOOLCHAINS=Off", output)
+        self.assertNotIn("-DRust_COMPILER=/target/host/bin/rustc", output)
+
     def test_all_modules_and_dashboard(self):
         output = evaluate([*MODULES, "dashboard"])
         self.assertIn("DOWNLOAD=netdata-dashboard", output)
@@ -108,6 +127,7 @@ class PackageSelection(unittest.TestCase):
         self.assertIn("/install/plugin-go/usr/lib/netdata/conf.d/go.d/mysql.conf", output)
         self.assertIn("golang1.27/host", output)
         self.assertIn("rust/host", output)
+        self.assertIn("-DRust_COMPILER=/target/host/bin/rustc", output)
 
 
 if __name__ == "__main__":
