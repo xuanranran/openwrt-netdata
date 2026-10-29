@@ -1,0 +1,14 @@
+--- a/net/curl/Config.in
++++ b/net/curl/Config.in
+@@ -1,4 +1,4 @@
+-if PACKAGE_libcurl
++menu "libcurl features"
+ 
+ comment "SSL support"
+ 
+@@ -164,4 +164,4 @@
+ config LIBCURL_HTTP_AUTH
+ 	bool "Enable HTTP authentication support"
+ 	default y
+-endif
++endmenu

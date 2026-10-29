@@ -44,7 +44,20 @@ if [ ! -f "$SDK_DIR/.netdata-sdk-ready" ]; then
 fi
 
 cd "$SDK_DIR"
+cleanup() {
+    if [ "${CURL_PATCHED:-0}" = 1 ]; then
+        patch -s -R -d feeds/packages -p1 < "$ROOT/scripts/sdk-patches/curl-menu-visibility.patch"
+    fi
+    if [ -n "${ARCHIVE:-}" ]; then rm -f "$ARCHIVE"; fi
+}
+trap cleanup EXIT
 ./scripts/feeds update base packages luci
+# Avoid a feature -> package -> feature Kconfig cycle in the upstream curl
+# menu when conditional library constraints are propagated by SDK metadata.
+if grep -qx 'if PACKAGE_libcurl' feeds/packages/net/curl/Config.in; then
+    patch -d feeds/packages -p1 < "$ROOT/scripts/sdk-patches/curl-menu-visibility.patch"
+    CURL_PATCHED=1
+fi
 # Clear feed links from older cached builds, not the compiled dependencies.
 ./scripts/feeds uninstall -a
 # Install only the sources needed by the enabled Netdata modules. The feeds

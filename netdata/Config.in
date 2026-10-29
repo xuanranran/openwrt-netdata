@@ -1,5 +1,5 @@
+# Optional library gates must not depend back on the package selecting them.
 menu "Core features"
-    depends on PACKAGE_netdata
 
 config NETDATA_DBENGINE
     bool "DBENGINE historical metrics storage"

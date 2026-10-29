@@ -37,6 +37,8 @@ jobs:
           python3 tests/test_package_selection.py
           python3 tests/test_config_helpers.py
           python3 tests/test_sdk_config.py
+          python3 -m pip install --target "$RUNNER_TEMP/kconfig-tests" kconfiglib==14.1.0
+          PYTHONPATH="$RUNNER_TEMP/kconfig-tests" python3 tests/test_kconfig.py
           for script in scripts/*.sh install.sh netdata/files/netdata.init netdata/files/netdata.postinst netdata/files/logread.plugin netdata/files/update-go-config netdata/files/render-config; do
             bash -n "$script"
           done
